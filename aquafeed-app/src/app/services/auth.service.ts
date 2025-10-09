@@ -30,19 +30,21 @@ export class AuthService {
   }
 
   private getApiUrl(): string {
-    // Detectar automáticamente la URL del API basada en el entorno
+    // Para producción, usar siempre el dominio correcto
     const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
+    
+    console.log('🔍 Detectando entorno:', { hostname, origin: window.location.origin });
     
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       // Desarrollo local
-      return 'http://localhost:3000/api';
-    } else if (hostname === 'aquafeed.com.ar') {
-      // Producción con dominio
-      return `${protocol}//aquafeed.com.ar:3000/api`;
+      const apiUrl = 'http://localhost:3000/api';
+      console.log('🏠 Modo desarrollo:', apiUrl);
+      return apiUrl;
     } else {
-      // Para cualquier otra IP (como EC2)
-      return `${protocol}//${hostname}:3000/api`;
+      // Producción: usar el mismo dominio pero con /api (a través de Nginx)
+      const apiUrl = `${window.location.origin}/api`;
+      console.log('🌐 Modo producción:', apiUrl);
+      return apiUrl;
     }
   }
 
