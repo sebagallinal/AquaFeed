@@ -8,7 +8,18 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = 'tu_clave_secreta_jwt_muy_segura_aqui';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:4200',           // Desarrollo local
+    'http://127.0.0.1:4200',          // Desarrollo local alternativo
+    'http://aquafeed.com.ar',         // Dominio de producción
+    'https://aquafeed.com.ar',        // Dominio de producción con HTTPS
+    /^http:\/\/\d+\.\d+\.\d+\.\d+:4200$/, // Cualquier IP con puerto 4200
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(express.json());
 
 // Base de datos simulada en memoria (en producción usar una base de datos real)

@@ -9,7 +9,7 @@ import { User, LoginRequest, LoginResponse, AuthState, UserRole } from '../model
   providedIn: 'root'
 })
 export class AuthService {
-  private readonly API_URL = 'http://localhost:3000/api';
+  private readonly API_URL = this.getApiUrl();
   private readonly TOKEN_KEY = 'aquafeed_token';
   private readonly USER_KEY = 'aquafeed_user';
 
@@ -27,6 +27,23 @@ export class AuthService {
     private router: Router
   ) {
     this.initializeAuthState();
+  }
+
+  private getApiUrl(): string {
+    // Detectar automáticamente la URL del API basada en el entorno
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // Desarrollo local
+      return 'http://localhost:3000/api';
+    } else if (hostname === 'aquafeed.com.ar') {
+      // Producción con dominio
+      return `${protocol}//aquafeed.com.ar:3000/api`;
+    } else {
+      // Para cualquier otra IP (como EC2)
+      return `${protocol}//${hostname}:3000/api`;
+    }
   }
 
   private initializeAuthState(): void {
