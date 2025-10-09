@@ -1,0 +1,171 @@
+<div class="admin-container">
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="header-content">
+      <div class="welcome-section">
+        <h1>🛠️ Consola de Administración</h1>
+        <p>Panel de control para administradores - {{ user?.name }}</p>
+      </div>
+      <div class="header-actions">
+        <button class="dashboard-btn" (click)="goToDashboard()">
+          <span class="icon">📊</span>
+          Dashboard
+        </button>
+        <button class="refresh-btn" (click)="refreshData()" [disabled]="isLoading">
+          <span class="icon" [class.spinning]="isLoading">🔄</span>
+          Actualizar
+        </button>
+        <button class="logout-btn" (click)="logout()">
+          <span class="icon">🚪</span>
+          Cerrar Sesión
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Cargando datos administrativos...</p>
+  </div>
+
+  <!-- Main Content -->
+  <main *ngIf="!isLoading" class="admin-main">
+    <!-- System Status -->
+    <section class="status-section">
+      <h2>Estado del Sistema</h2>
+      <div class="status-grid">
+        <div class="status-card system-health">
+          <div class="status-icon" [style.background-color]="getSystemStatusColor()">🏥</div>
+          <div class="status-content">
+            <h3>Salud del Sistema</h3>
+            <p class="status-value" [style.color]="getSystemStatusColor()">
+              {{ adminData?.systemHealth || 'Desconocido' }}
+            </p>
+            <span class="status-label">Estado actual</span>
+          </div>
+        </div>
+
+        <div class="status-card uptime">
+          <div class="status-icon">⏱️</div>
+          <div class="status-content">
+            <h3>Tiempo Activo</h3>
+            <p class="status-value">{{ formatUptime(adminData?.serverUptime || 0) }}</p>
+            <span class="status-label">Servidor en línea</span>
+          </div>
+        </div>
+
+        <div class="status-card users-count">
+          <div class="status-icon">👥</div>
+          <div class="status-content">
+            <h3>Total de Usuarios</h3>
+            <p class="status-value">{{ adminData?.totalUsers || 0 }}</p>
+            <span class="status-label">Usuarios registrados</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Admin Features -->
+    <section class="features-section">
+      <h2>Funcionalidades Administrativas</h2>
+      <div class="features-grid">
+        <div class="feature-card" *ngFor="let feature of adminData?.adminFeatures">
+          <div class="feature-icon">⚡</div>
+          <div class="feature-content">
+            <h3>{{ feature }}</h3>
+            <p>Gestionar y configurar {{ feature.toLowerCase() }}</p>
+            <button class="feature-btn">Acceder</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Users Management -->
+    <section class="users-section">
+      <h2>Gestión de Usuarios</h2>
+      <div class="users-container">
+        <div class="users-header">
+          <h3>Lista de Usuarios ({{ allUsers.length }})</h3>
+          <button class="add-user-btn">
+            <span class="icon">➕</span>
+            Agregar Usuario
+          </button>
+        </div>
+        
+        <div class="users-table">
+          <div class="table-header">
+            <div class="col">ID</div>
+            <div class="col">Nombre</div>
+            <div class="col">Usuario</div>
+            <div class="col">Email</div>
+            <div class="col">Rol</div>
+            <div class="col">Acciones</div>
+          </div>
+          
+          <div class="table-row" *ngFor="let userItem of allUsers">
+            <div class="col">{{ userItem.id }}</div>
+            <div class="col">{{ userItem.name }}</div>
+            <div class="col">{{ userItem.username }}</div>
+            <div class="col">{{ userItem.email }}</div>
+            <div class="col">
+              <span class="role-badge" [style.background-color]="getUserRoleColor(userItem.role)">
+                {{ getUserRoleLabel(userItem.role) }}
+              </span>
+            </div>
+            <div class="col">
+              <button class="action-btn edit-btn" title="Editar">✏️</button>
+              <button class="action-btn delete-btn" title="Eliminar" [disabled]="userItem.id === user?.id">🗑️</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- System Actions -->
+    <section class="actions-section">
+      <h2>Acciones del Sistema</h2>
+      <div class="system-actions">
+        <button class="system-action backup">
+          <div class="action-icon">💾</div>
+          <h3>Crear Backup</h3>
+          <p>Generar copia de seguridad del sistema</p>
+        </button>
+
+        <button class="system-action maintenance">
+          <div class="action-icon">🔧</div>
+          <h3>Modo Mantenimiento</h3>
+          <p>Activar/desactivar modo mantenimiento</p>
+        </button>
+
+        <button class="system-action logs">
+          <div class="action-icon">📋</div>
+          <h3>Ver Logs</h3>
+          <p>Consultar registros del sistema</p>
+        </button>
+
+        <button class="system-action settings">
+          <div class="action-icon">⚙️</div>
+          <h3>Configuración Global</h3>
+          <p>Ajustar configuraciones del sistema</p>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Admin Footer -->
+  <footer class="admin-footer">
+    <div class="footer-content">
+      <div class="admin-info">
+        <span class="admin-details">
+          <strong>{{ user?.name }}</strong> - Administrador del Sistema
+        </span>
+        <span class="admin-email">{{ user?.email }}</span>
+      </div>
+      <div class="system-info">
+        <span>AquaFeed Admin Panel v1.0</span>
+        <span>Sistema en funcionamiento</span>
+      </div>
+    </div>
+  </footer>
+</div>
