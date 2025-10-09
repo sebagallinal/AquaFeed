@@ -10,6 +10,7 @@ const JWT_SECRET = 'tu_clave_secreta_jwt_muy_segura_aqui';
 // Middleware
 app.use(cors({
   origin: [
+    'http://18.116.202.211',      // IP pública del servidor EC2
     'http://localhost:4200',           // Desarrollo local
     'http://127.0.0.1:4200',          // Desarrollo local alternativo
     'http://aquafeed.com.ar',         // Dominio de producción
