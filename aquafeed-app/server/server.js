@@ -218,14 +218,19 @@ app.use((err, req, res, next) => {
 });
 
 // Inicializar servidor
-initializeUsers().then(() => {
-  app.listen(PORT, () => {
-    console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
-    console.log(`📡 API disponible en http://localhost:${PORT}/api`);
-    console.log('👤 Usuarios de prueba:');
-    console.log('   Admin: username=admin, password=admin123');
-    console.log('   Usuario: username=usuario, password=user123');
+initializeUsers()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
+      console.log(`📡 API disponible en http://localhost:${PORT}/api`);
+      console.log('👤 Usuarios de prueba:');
+      console.log('   Admin: username=admin, password=admin123');
+      console.log('   Usuario: username=usuario, password=user123');
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Error al inicializar usuarios:', err);
+    process.exit(1); // <- opcional, para indicar que hubo error real
   });
-});
 
 module.exports = app;
