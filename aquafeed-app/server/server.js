@@ -33,82 +33,51 @@ app.use(express.json());
 const fs = require('fs');
 const mqtt = require('mqtt');
 
-const MQTT_URL = process.env.MQTT_URL || 'mqtts://mqtt:8883';
-const MQTT_CA  = process.env.MQTT_CA  || '/run/secrets/clients_ca';
-const MQTT_CERT= process.env.MQTT_CLIENT_CERT || '/run/secrets/api_client_cert';
-const MQTT_KEY = process.env.MQTT_CLIENT_KEY  || '/run/secrets/api_client_key';
+const MQTT_URL  = process.env.MQTT_URL  || 'mqtts://mqtt:8883';
+const MQTT_CA   = process.env.MQTT_CA   || '/run/secrets/clients_ca';
+const MQTT_CERT = process.env.MQTT_CLIENT_CERT || '/run/secrets/api_client_cert';
+const MQTT_KEY  = process.env.MQTT_CLIENT_KEY  || '/run/secrets/api_client_key';
 
-// Lee credenciales desde Docker Secrets (o rutas locales)
+// lee desde Docker Secrets
 const tlsOptions = {
   ca:   fs.readFileSync(MQTT_CA),
   cert: fs.readFileSync(MQTT_CERT),
   key:  fs.readFileSync(MQTT_KEY),
-  // SNI/hostname: con mqtt.js toma del host en la URL, en tu caso "mqtt".
-  // Si conectaras por DNS público, usa mqtts://mqtt.aquafeed.com.ar:8883
-  rejectUnauthorized: true, // verifica que el server.crt matchee el SAN
-  // IMPORTANTE: NO pongas username/password si usás mTLS con use_identity_as_username
-  // Mosquitto toma el CN del cert como username ("api")
+  rejectUnauthorized: true,   // valida server.crt contra tu CA
 };
 
 const mqttClient = mqtt.connect(MQTT_URL, {
   ...tlsOptions,
   protocol: 'mqtts',
-  clientId: 'api',      // Debe existir un cert cuyo CN=api (ya lo tenés)
+  clientId: 'api',        // debe existir cert CN=api + ACL para 'api'
   keepalive: 30,
   clean: true,
-  reconnectPeriod: 2000, // reconexión automática
+  reconnectPeriod: 2000,
 });
 
-// Cache en memoria (puedes reemplazar luego por DB)
-const deviceState = {
-  // ejemplo:
-  // '1': {
-  //   ambiente: { tempAmb: 23.2, humAmb: 51.1, ts: '...' },
-  //   agua:     { tempAgua: 24, ph: 7.2, minerales: 40, ts: '...' },
-  // }
-};
+const deviceState = {}; // cache simple en memoria
 
 mqttClient.on('connect', () => {
   console.log('✅ MQTT (API) conectada');
-
-  // Suscribite a lo que tu API necesita leer
-  // (según tu ACL para "api": aquafeed/+/agua y aquafeed/+/ambiente)
   mqttClient.subscribe(['aquafeed/+/agua', 'aquafeed/+/ambiente'], (err, granted) => {
-    if (err) {
-      console.error('❌ Error al suscribir topics:', err);
-    } else {
-      console.log('📡 Suscripto a:', granted.map(g => `${g.topic} (QoS ${g.qos})`).join(', '));
-    }
+    if (err) return console.error('❌ Error al suscribir:', err);
+    console.log('📡 Suscripto a:', granted.map(g => `${g.topic}(q${g.qos})`).join(', '));
   });
 });
 
 mqttClient.on('message', (topic, payload) => {
   try {
     const data = JSON.parse(payload.toString());
-    // topic: aquafeed/{id}/agua  | aquafeed/{id}/ambiente
-    const parts = topic.split('/');
-    const devId = parts[1];
-    const tipo  = parts[2]; // 'agua' o 'ambiente'
-
-    if (!deviceState[devId]) deviceState[devId] = {};
-    deviceState[devId][tipo] = { ...data, ts: new Date().toISOString() };
-    // Opcional: persistir en DB aquí
+    const [_, id, tipo] = topic.split('/'); // aquafeed/{id}/{tipo}
+    deviceState[id] ??= {};
+    deviceState[id][tipo] = { ...data, ts: new Date().toISOString() };
   } catch (e) {
-    console.error('❌ Error parseando payload MQTT:', e, 'topic=', topic, 'payload=', payload.toString());
+    console.error('❌ Error parseando', topic, payload.toString(), e);
   }
 });
 
-mqttClient.on('error', (err) => {
-  console.error('❌ Error MQTT (API):', err.message);
-});
-
-mqttClient.on('close', () => {
-  console.warn('⚠️ Conexión MQTT (API) cerrada');
-});
-
-mqttClient.on('reconnect', () => {
-  console.log('🔁 Reintentando conexión MQTT (API)…');
-});
+mqttClient.on('error', e => console.error('❌ MQTT error:', e.message));
+mqttClient.on('reconnect', () => console.log('🔁 MQTT reconectando…'));
 
 // Obtener último estado de agua/ambiente de un device
 app.get('/api/devices/:id/state', authenticateToken, (req, res) => {
