@@ -79,29 +79,7 @@ mqttClient.on('message', (topic, payload) => {
 mqttClient.on('error', e => console.error('❌ MQTT error:', e.message));
 mqttClient.on('reconnect', () => console.log('🔁 MQTT reconectando…'));
 
-// Obtener último estado de agua/ambiente de un device
-app.get('/api/devices/:id/state', authenticateToken, (req, res) => {
-  const { id } = req.params;
-  const state = deviceState[id] || {};
-  res.json({ id, state });
-});
 
-// Enviar comando "alimentar" al device (publica en aquafeed/{id}/alimentar)
-app.post('/api/devices/:id/alimentar', authenticateToken, (req, res) => {
-  const { id } = req.params;
-
-  // Tu ESP32 escucha exactamente este topic y el payload "alimentar"
-  const topic = `aquafeed/${id}/alimentar`;
-  const msg   = 'alimentar';
-
-  mqttClient.publish(topic, msg, { qos: 0, retain: false }, (err) => {
-    if (err) {
-      console.error('❌ Error publicando alimentar:', err);
-      return res.status(500).json({ ok: false, error: 'MQTT publish error' });
-    }
-    res.json({ ok: true, topic, msg });
-  });
-});
 
 // ####################
 // ####################
@@ -294,6 +272,30 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
+  });
+});
+
+// Obtener último estado de agua/ambiente de un device
+app.get('/api/devices/:id/state', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  const state = deviceState[id] || {};
+  res.json({ id, state });
+});
+
+// Enviar comando "alimentar" al device (publica en aquafeed/{id}/alimentar)
+app.post('/api/devices/:id/alimentar', authenticateToken, (req, res) => {
+  const { id } = req.params;
+
+  // Tu ESP32 escucha exactamente este topic y el payload "alimentar"
+  const topic = `aquafeed/${id}/alimentar`;
+  const msg   = 'alimentar';
+
+  mqttClient.publish(topic, msg, { qos: 0, retain: false }, (err) => {
+    if (err) {
+      console.error('❌ Error publicando alimentar:', err);
+      return res.status(500).json({ ok: false, error: 'MQTT publish error' });
+    }
+    res.json({ ok: true, topic, msg });
   });
 });
 
