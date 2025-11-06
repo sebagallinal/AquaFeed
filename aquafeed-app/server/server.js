@@ -2,25 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const http = require('http');
-const { Server } = require('socket.io');
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: [
-      'http://18.116.202.211',      // IP pública del servidor EC2
-      'http://localhost:4200',           // Desarrollo local
-      'http://127.0.0.1:4200',          // Desarrollo local alternativo
-      'http://aquafeed.com.ar',         // Dominio de producción
-      'https://aquafeed.com.ar',        // Dominio de producción con HTTPS
-      /^http:\/\/\d+\.\d+\.\d+\.\d+:4200$/, // Cualquier IP con puerto 4200
-    ],
-    methods: ["GET", "POST"]
-  }
-});
-
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = 'UCAECE2025_Aquafeed_API_Secret_Key';
 
@@ -89,14 +72,7 @@ mqttClient.on('message', (topic, payload) => {
     deviceState[id] ??= {};
     deviceState[id][tipo] = { ...data, ts: new Date().toISOString() };
     
-    // Emitir datos en tiempo real a clientes conectados
-    io.emit('device-data', {
-      deviceId: id,
-      type: tipo,
-      data: deviceState[id][tipo]
-    });
-    
-    console.log(`📡 Datos recibidos y enviados via WebSocket: Device ${id} - ${tipo}`, data);
+    console.log(`📡 Datos recibidos: Device ${id} - ${tipo}`, data);
   } catch (e) {
     console.error('❌ Error parseando', topic, payload.toString(), e);
   }
@@ -110,30 +86,6 @@ mqttClient.on('reconnect', () => console.log('🔁 MQTT reconectando…'));
 // ####################
 // ####################
 //      FIN MQTT 
-// ####################
-// ####################
-
-// ####################
-// ####################
-//      WEBSOCKET 
-// ####################
-// ####################
-
-// Manejar conexiones WebSocket
-io.on('connection', (socket) => {
-  console.log('🔗 Cliente WebSocket conectado:', socket.id);
-  
-  // Enviar estado actual de todos los dispositivos al conectarse
-  socket.emit('initial-device-state', deviceState);
-  
-  socket.on('disconnect', () => {
-    console.log('🔌 Cliente WebSocket desconectado:', socket.id);
-  });
-});
-
-// ####################
-// ####################
-//    FIN WEBSOCKET 
 // ####################
 // ####################
 
@@ -363,10 +315,9 @@ app.use((err, req, res, next) => {
 // Inicializar servidor
 initializeUsers()
   .then(() => {
-    server.listen(PORT, () => {
+    app.listen(PORT, () => {
       console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
       console.log(`📡 API disponible en http://localhost:${PORT}/api`);
-      console.log(`🔗 WebSocket disponible en http://localhost:${PORT}`);
       console.log('👤 Usuarios de prueba:');
       console.log('   Admin: username=admin, password=admin123');
       console.log('   Usuario: username=usuario, password=user123');

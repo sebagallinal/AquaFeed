@@ -67,7 +67,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private initializeRealtimeData(): void {
-    // Conectar al WebSocket
+    // Conectar (iniciar polling HTTP)
     this.realtimeDataService.connect();
 
     // Suscribirse al estado de conexión
@@ -75,7 +75,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(status => {
         this.isWebSocketConnected = status;
-        console.log('WebSocket estado:', status ? 'Conectado' : 'Desconectado');
+        console.log('Polling estado:', status ? 'Activo' : 'Inactivo');
       });
 
     // Suscribirse a los datos de dispositivos
@@ -89,7 +89,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private startAutoRefresh(): void {
-    // Actualizar cada 5 segundos (opcional, ya que WebSocket actualiza en tiempo real)
+    // Actualizar timestamp cada 5 segundos para mostrar "último refresco"
     interval(5000)
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
-import { io, Socket } from 'socket.io-client';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { BehaviorSubject, Observable, interval, Subscription } from 'rxjs';
+import { switchMap, catchError } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface DeviceData {
@@ -28,11 +29,12 @@ export interface DeviceState {
   providedIn: 'root'
 })
 export class RealtimeDataService {
-  private socket: Socket | null = null;
   private devicesSubject = new BehaviorSubject<DeviceState>({});
   private connectionStatusSubject = new BehaviorSubject<boolean>(false);
+  private pollingSubscription?: Subscription;
+  private readonly POLL_INTERVAL = 5000; // 5 segundos
 
-  constructor() {}
+  constructor(private http: HttpClient) {}
 
   // Observable para los datos de dispositivos
   get devices$(): Observable<DeviceState> {
@@ -44,66 +46,81 @@ export class RealtimeDataService {
     return this.connectionStatusSubject.asObservable();
   }
 
-  // Conectar al WebSocket
+  // Conectar (iniciar polling)
   connect(): void {
-    if (this.socket?.connected) {
-      return;
+    if (this.pollingSubscription && !this.pollingSubscription.closed) {
+      return; // Ya está conectado
     }
 
-    const serverUrl = environment.websocketUrl;
+    console.log('🔗 Iniciando polling de datos cada 5 segundos...');
+    this.connectionStatusSubject.next(true);
 
-    console.log('🔗 Conectando a WebSocket:', serverUrl);
+    // Hacer primera consulta inmediatamente
+    this.fetchDeviceData();
 
-    this.socket = io(serverUrl, {
-      transports: ['websocket', 'polling'],
-      forceNew: true
-    });
+    // Luego consultar cada 5 segundos
+    this.pollingSubscription = interval(this.POLL_INTERVAL)
+      .pipe(
+        switchMap(() => this.getDevicesFromAPI())
+      )
+      .subscribe({
+        next: (response) => {
+          this.updateDeviceState(response.devices);
+        },
+        error: (error) => {
+          console.error('❌ Error al obtener datos de dispositivos:', error);
+          this.connectionStatusSubject.next(false);
+        }
+      });
+  }
 
-    this.socket.on('connect', () => {
-      console.log('🔗 Conectado al WebSocket servidor');
-      this.connectionStatusSubject.next(true);
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('🔌 Desconectado del WebSocket servidor');
+  // Desconectar (detener polling)
+  disconnect(): void {
+    if (this.pollingSubscription) {
+      this.pollingSubscription.unsubscribe();
+      this.pollingSubscription = undefined;
       this.connectionStatusSubject.next(false);
+      console.log('🔌 Polling detenido');
+    }
+  }
+
+  // Obtener datos del API
+  private getDevicesFromAPI(): Observable<{ devices: DeviceState }> {
+    const token = localStorage.getItem('token');
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${token}`
     });
 
-    // Recibir estado inicial de dispositivos
-    this.socket.on('initial-device-state', (deviceState: DeviceState) => {
-      console.log('📡 Estado inicial de dispositivos recibido:', deviceState);
-      this.devicesSubject.next(deviceState);
-    });
+    return this.http.get<{ devices: DeviceState }>(
+      `${environment.apiUrl}/devices/all`,
+      { headers }
+    ).pipe(
+      catchError(error => {
+        console.error('Error fetching device data:', error);
+        throw error;
+      })
+    );
+  }
 
-    // Recibir actualizaciones en tiempo real
-    this.socket.on('device-data', (deviceData: DeviceData) => {
-      console.log('📊 Nuevos datos de dispositivo:', deviceData);
-      
-      const currentDevices = this.devicesSubject.value;
-      const updatedDevices = { ...currentDevices };
-      
-      if (!updatedDevices[deviceData.deviceId]) {
-        updatedDevices[deviceData.deviceId] = {};
+  // Fetch inicial
+  private fetchDeviceData(): void {
+    this.getDevicesFromAPI().subscribe({
+      next: (response) => {
+        console.log('📡 Estado inicial de dispositivos recibido:', response.devices);
+        this.updateDeviceState(response.devices);
+        this.connectionStatusSubject.next(true);
+      },
+      error: (error) => {
+        console.error('❌ Error al cargar datos iniciales:', error);
+        this.connectionStatusSubject.next(false);
       }
-      
-      updatedDevices[deviceData.deviceId][deviceData.type] = deviceData.data;
-      
-      this.devicesSubject.next(updatedDevices);
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('❌ Error de conexión WebSocket:', error);
-      this.connectionStatusSubject.next(false);
     });
   }
 
-  // Desconectar del WebSocket
-  disconnect(): void {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-      this.connectionStatusSubject.next(false);
-    }
+  // Actualizar estado de dispositivos
+  private updateDeviceState(devices: DeviceState): void {
+    this.devicesSubject.next(devices);
+    console.log('📊 Datos de dispositivos actualizados:', devices);
   }
 
   // Obtener dispositivos del estado actual

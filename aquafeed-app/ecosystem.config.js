@@ -10,7 +10,7 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
         PORT: 3000,
-        JWT_SECRET: 'tu_clave_jwt_super_segura_para_produccion'
+        JWT_SECRET: 'UNIVERSIDADcaece2025AQUAFEEDSECRET',
       }
     },
     {
