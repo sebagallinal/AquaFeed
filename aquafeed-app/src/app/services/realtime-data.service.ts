@@ -16,6 +16,8 @@ export interface DeviceData {
     oxigeno?: number;
     turbidez?: number;
     // Datos de ambiente
+    humAmb?: number;
+    tempAmb?: number;
     humedad?: number;
     temperaturaAmbiente?: number;
     // Metadata

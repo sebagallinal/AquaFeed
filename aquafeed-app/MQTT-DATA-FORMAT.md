@@ -29,14 +29,16 @@ Tu sistema Arduino/ESP32 debe publicar datos en los siguientes topics:
 **Formato JSON:**
 ```json
 {
-  "temperaturaAmbiente": 22.3,
-  "humedad": 65
+  "id": "1",
+  "tempAmb": 24.8,
+  "humAmb": 41
 }
 ```
 
 **Campos:**
-- `temperaturaAmbiente` (float): Temperatura ambiente en °C
-- `humedad` (float): Humedad relativa en %
+- `id` (string): ID del dispositivo
+- `tempAmb` (float): Temperatura ambiente en °C
+- `humAmb` (int): Humedad ambiente en %
 
 ## Ejemplo de Código Arduino/ESP32
 
@@ -111,8 +113,9 @@ void publishWaterData() {
 void publishAmbientData() {
   StaticJsonDocument<200> doc;
   
-  doc["temperaturaAmbiente"] = readAmbientTemperature();
-  doc["humedad"] = readHumidity();
+  doc["id"] = device_id;
+  doc["tempAmb"] = readAmbientTemperature();
+  doc["humAmb"] = readHumidity();
   
   char jsonBuffer[200];
   serializeJson(doc, jsonBuffer);
@@ -207,5 +210,5 @@ Para probar el sistema sin hardware, puedes usar `mosquitto_pub`:
 mosquitto_pub -h localhost -p 1883 -t "aquafeed/1/agua" -m '{"id":"1","tempAgua":25.5,"ph":7.2,"minerales":1}'
 
 # Publicar datos de ambiente
-mosquitto_pub -h localhost -p 1883 -t "aquafeed/1/ambiente" -m '{"temperaturaAmbiente":22.3,"humedad":65}'
+mosquitto_pub -h localhost -p 1883 -t "aquafeed/1/ambiente" -m '{"id":"1","tempAmb":24.8,"humAmb":41}'
 ```

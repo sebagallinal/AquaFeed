@@ -80,16 +80,16 @@
           <div class="sensor-data" *ngIf="getAmbientData(deviceId) as ambientData">
             <h4>🌡️ Parámetros del Ambiente</h4>
             <div class="sensor-readings">
-              <div class="reading-item" *ngIf="ambientData.temperaturaAmbiente !== undefined">
+              <div class="reading-item" *ngIf="ambientData.tempAmb !== undefined">
                 <span class="reading-label">🌡️ Temperatura Ambiente</span>
                 <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'ambiente')">
-                  {{ ambientData.temperaturaAmbiente | number:'1.1-1' }}°C
+                  {{ ambientData.tempAmb | number:'1.1-1' }}°C
                 </span>
               </div>
-              <div class="reading-item" *ngIf="ambientData.humedad !== undefined">
-                <span class="reading-label">💧 Humedad</span>
+              <div class="reading-item" *ngIf="ambientData.humAmb !== undefined">
+                <span class="reading-label">💧 Humedad Ambiente</span>
                 <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'ambiente')">
-                  {{ ambientData.humedad | number:'1.0-0' }}%
+                  {{ ambientData.humAmb | number:'1.0-0' }}%
                 </span>
               </div>
             </div>
