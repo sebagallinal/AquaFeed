@@ -2,6 +2,7 @@
 
 export const environment = {
   production: true,
-  apiUrl: 'http://aquafeed.com.ar:3000/api',
-  frontendUrl: 'http://aquafeed.com.ar'
+  apiUrl: 'http://aquafeed.com.ar/api',
+  frontendUrl: 'http://aquafeed.com.ar',
+  websocketUrl: 'localhost:3000'
 };

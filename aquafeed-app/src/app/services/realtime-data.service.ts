@@ -50,9 +50,9 @@ export class RealtimeDataService {
       return;
     }
 
-    const serverUrl = environment.production 
-      ? 'http://18.116.202.211:3000' 
-      : 'http://localhost:3000';
+    const serverUrl = environment.websocketUrl;
+
+    console.log('🔗 Conectando a WebSocket:', serverUrl);
 
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
