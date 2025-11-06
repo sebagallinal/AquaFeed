@@ -56,6 +56,10 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "no-budgets": {
+              "budgets": [],
+              "outputHashing": "all"
             }
           },
           "defaultConfiguration": "production"
@@ -68,6 +72,9 @@
             },
             "development": {
               "buildTarget": "aquafeed-app:build:development"
+            },
+            "no-budgets": {
+              "buildTarget": "aquafeed-app:build:no-budgets"
             }
           },
           "defaultConfiguration": "development"
