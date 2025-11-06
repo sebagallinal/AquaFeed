@@ -1,9 +1,10 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
-import { AuthService } from '../../services';
+import { Subject, takeUntil, interval } from 'rxjs';
+import { AuthService, RealtimeDataService } from '../../services';
 import { User, DashboardData } from '../../models';
+import { DeviceState } from '../../services/realtime-data.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -14,22 +15,29 @@ import { User, DashboardData } from '../../models';
 export class DashboardComponent implements OnInit, OnDestroy {
   user: User | null = null;
   dashboardData: DashboardData | null = null;
+  devices: DeviceState = {};
   isLoading = true;
+  isWebSocketConnected = false;
+  lastUpdate: Date = new Date();
   private destroy$ = new Subject<void>();
 
   constructor(
     private authService: AuthService,
+    private realtimeDataService: RealtimeDataService,
     private router: Router
   ) {}
 
   ngOnInit(): void {
     this.subscribeToAuthState();
     this.loadDashboardData();
+    this.initializeRealtimeData();
+    this.startAutoRefresh();
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.realtimeDataService.disconnect();
   }
 
   private subscribeToAuthState(): void {
@@ -58,6 +66,39 @@ export class DashboardComponent implements OnInit, OnDestroy {
       });
   }
 
+  private initializeRealtimeData(): void {
+    // Conectar al WebSocket
+    this.realtimeDataService.connect();
+
+    // Suscribirse al estado de conexión
+    this.realtimeDataService.connectionStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(status => {
+        this.isWebSocketConnected = status;
+        console.log('WebSocket estado:', status ? 'Conectado' : 'Desconectado');
+      });
+
+    // Suscribirse a los datos de dispositivos
+    this.realtimeDataService.devices$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(devices => {
+        this.devices = devices;
+        this.lastUpdate = new Date();
+        console.log('Datos de dispositivos actualizados:', devices);
+      });
+  }
+
+  private startAutoRefresh(): void {
+    // Actualizar cada 5 segundos (opcional, ya que WebSocket actualiza en tiempo real)
+    interval(5000)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        // Esto es principalmente para mostrar un indicador de "último refresco"
+        // Los datos ya se actualizan en tiempo real via WebSocket
+        console.log('Verificando actualizaciones...');
+      });
+  }
+
   logout(): void {
     this.authService.logout();
   }
@@ -82,5 +123,48 @@ export class DashboardComponent implements OnInit, OnDestroy {
     } else {
       return 'Buenas noches';
     }
+  }
+
+  // Obtener lista de dispositivos
+  getDeviceIds(): string[] {
+    return Object.keys(this.devices);
+  }
+
+  // Obtener datos de agua de un dispositivo
+  getWaterData(deviceId: string) {
+    return this.devices[deviceId]?.agua || null;
+  }
+
+  // Obtener datos de ambiente de un dispositivo
+  getAmbientData(deviceId: string) {
+    return this.devices[deviceId]?.ambiente || null;
+  }
+
+  // Verificar si los datos son recientes
+  isDataRecent(deviceId: string, type: 'agua' | 'ambiente'): boolean {
+    return this.realtimeDataService.isDeviceDataRecent(deviceId, type);
+  }
+
+  // Formatear timestamp
+  formatTimestamp(timestamp: string): string {
+    if (!timestamp) return 'N/A';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('es-AR', { 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit' 
+    });
+  }
+
+  // Obtener tiempo transcurrido
+  getTimeSince(timestamp: string): string {
+    if (!timestamp) return 'N/A';
+    const now = new Date();
+    const then = new Date(timestamp);
+    const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return `${diffInSeconds}s`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    return `${Math.floor(diffInSeconds / 3600)}h`;
   }
 }

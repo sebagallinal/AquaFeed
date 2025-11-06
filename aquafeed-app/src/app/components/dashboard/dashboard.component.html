@@ -27,6 +27,101 @@
 
   <!-- Main Content -->
   <main *ngIf="!isLoading" class="dashboard-main">
+    <!-- WebSocket Status -->
+    <section class="websocket-status">
+      <div class="status-indicator" [class.connected]="isWebSocketConnected" [class.disconnected]="!isWebSocketConnected">
+        <span class="status-dot"></span>
+        <span class="status-text">
+          {{ isWebSocketConnected ? '🟢 Datos en tiempo real activos' : '🔴 Desconectado - Reconectando...' }}
+        </span>
+        <span class="last-update">Última actualización: {{ formatTimestamp(lastUpdate.toISOString()) }}</span>
+      </div>
+    </section>
+
+    <!-- Real-time Sensor Data -->
+    <section class="sensors-section" *ngIf="getDeviceIds().length > 0">
+      <h2>📊 Datos de Sensores en Tiempo Real</h2>
+      <div class="devices-grid">
+        <div class="device-card" *ngFor="let deviceId of getDeviceIds()">
+          <div class="device-header">
+            <h3>🔧 Dispositivo #{{ deviceId }}</h3>
+            <span class="device-badge">Activo</span>
+          </div>
+
+          <!-- Datos de Agua -->
+          <div class="sensor-data" *ngIf="getWaterData(deviceId) as waterData">
+            <h4>💧 Parámetros del Agua</h4>
+            <div class="sensor-readings">
+              <div class="reading-item" *ngIf="waterData.temperatura !== undefined">
+                <span class="reading-label">🌡️ Temperatura</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
+                  {{ waterData.temperatura | number:'1.1-1' }}°C
+                </span>
+              </div>
+              <div class="reading-item" *ngIf="waterData.ph !== undefined">
+                <span class="reading-label">⚗️ pH</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
+                  {{ waterData.ph | number:'1.2-2' }}
+                </span>
+              </div>
+              <div class="reading-item" *ngIf="waterData.oxigeno !== undefined">
+                <span class="reading-label">💨 Oxígeno</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
+                  {{ waterData.oxigeno | number:'1.1-1' }} mg/L
+                </span>
+              </div>
+              <div class="reading-item" *ngIf="waterData.turbidez !== undefined">
+                <span class="reading-label">🌊 Turbidez</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
+                  {{ waterData.turbidez | number:'1.0-0' }} NTU
+                </span>
+              </div>
+            </div>
+            <div class="timestamp">
+              <small>Actualizado: {{ formatTimestamp(waterData.ts) }} (hace {{ getTimeSince(waterData.ts) }})</small>
+            </div>
+          </div>
+
+          <!-- Datos de Ambiente -->
+          <div class="sensor-data" *ngIf="getAmbientData(deviceId) as ambientData">
+            <h4>🌡️ Parámetros del Ambiente</h4>
+            <div class="sensor-readings">
+              <div class="reading-item" *ngIf="ambientData.temperaturaAmbiente !== undefined">
+                <span class="reading-label">🌡️ Temperatura Ambiente</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'ambiente')">
+                  {{ ambientData.temperaturaAmbiente | number:'1.1-1' }}°C
+                </span>
+              </div>
+              <div class="reading-item" *ngIf="ambientData.humedad !== undefined">
+                <span class="reading-label">💧 Humedad</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'ambiente')">
+                  {{ ambientData.humedad | number:'1.0-0' }}%
+                </span>
+              </div>
+            </div>
+            <div class="timestamp">
+              <small>Actualizado: {{ formatTimestamp(ambientData.ts) }} (hace {{ getTimeSince(ambientData.ts) }})</small>
+            </div>
+          </div>
+
+          <!-- No hay datos -->
+          <div class="no-data" *ngIf="!getWaterData(deviceId) && !getAmbientData(deviceId)">
+            <p>⏳ Esperando datos del dispositivo...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mensaje cuando no hay dispositivos -->
+    <section class="no-devices" *ngIf="getDeviceIds().length === 0">
+      <div class="empty-state">
+        <div class="empty-icon">📡</div>
+        <h3>No hay dispositivos conectados</h3>
+        <p>Los dispositivos aparecerán aquí cuando comiencen a enviar datos.</p>
+        <p class="help-text">Asegúrate de que tus dispositivos Arduino/ESP32 estén encendidos y conectados al servidor MQTT.</p>
+      </div>
+    </section>
+
     <!-- Stats Cards -->
     <section class="stats-section">
       <h2>Estadísticas del Sistema</h2>
