@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { Subject, takeUntil, interval } from 'rxjs';
-import { AuthService, RealtimeDataService } from '../../services';
+import { AuthService, RealtimeDataService, DeviceService } from '../../services';
 import { User, DashboardData } from '../../models';
 import { DeviceState } from '../../services/realtime-data.service';
 
@@ -19,11 +19,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isLoading = true;
   isWebSocketConnected = false;
   lastUpdate: Date = new Date();
+  isFeeding = false;
+  feedingMessage = '';
   private destroy$ = new Subject<void>();
 
   constructor(
     private authService: AuthService,
     private realtimeDataService: RealtimeDataService,
+    private deviceService: DeviceService,
     private router: Router
   ) {}
 
@@ -166,5 +169,48 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (diffInSeconds < 60) return `${diffInSeconds}s`;
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
     return `${Math.floor(diffInSeconds / 3600)}h`;
+  }
+
+  // Alimentar dispositivo
+  feedNow(): void {
+    if (!this.user?.deviceId) {
+      this.feedingMessage = '❌ No tienes un dispositivo asignado';
+      return;
+    }
+
+    if (this.isFeeding) {
+      return; // Ya se está alimentando
+    }
+
+    this.isFeeding = true;
+    this.feedingMessage = '⏳ Enviando comando de alimentación...';
+
+    this.deviceService.feedDevice(this.user.deviceId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          if (response.ok) {
+            this.feedingMessage = '✅ ¡Alimentación exitosa!';
+            console.log('✅ Comando enviado:', response);
+          } else {
+            this.feedingMessage = `❌ Error: ${response.error}`;
+          }
+          this.isFeeding = false;
+          
+          // Limpiar mensaje después de 3 segundos
+          setTimeout(() => {
+            this.feedingMessage = '';
+          }, 3000);
+        },
+        error: (error) => {
+          console.error('❌ Error al alimentar:', error);
+          this.feedingMessage = '❌ Error al enviar comando';
+          this.isFeeding = false;
+          
+          setTimeout(() => {
+            this.feedingMessage = '';
+          }, 3000);
+        }
+      });
   }
 }

@@ -4,6 +4,7 @@ export interface User {
   email: string;
   role: UserRole;
   name: string;
+  deviceId: string;
 }
 
 export type UserRole = 'admin' | 'user';

@@ -152,11 +152,25 @@
     <!-- Quick Actions -->
     <section class="actions-section">
       <h2>Acciones Rápidas</h2>
+      
+      <!-- Mensaje de estado de alimentación -->
+      <div class="feeding-status" *ngIf="feedingMessage">
+        <p [class.success]="feedingMessage.includes('✅')" 
+           [class.error]="feedingMessage.includes('❌')"
+           [class.loading]="feedingMessage.includes('⏳')">
+          {{ feedingMessage }}
+        </p>
+      </div>
+
       <div class="actions-grid">
-        <button class="action-card">
+        <button class="action-card feed-button" 
+                (click)="feedNow()" 
+                [disabled]="isFeeding"
+                [class.feeding]="isFeeding">
           <div class="action-icon">🍽️</div>
-          <h3>Alimentar Ahora</h3>
+          <h3>{{ isFeeding ? 'Alimentando...' : 'Alimentar Ahora' }}</h3>
           <p>Ejecutar alimentación manual</p>
+          <small *ngIf="user && user.deviceId">Dispositivo: #{{ user.deviceId }}</small>
         </button>
 
         <button class="action-card">

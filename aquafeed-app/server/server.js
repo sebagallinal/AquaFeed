@@ -97,7 +97,8 @@ const users = [
     email: 'admin@aquafeed.com',
     password: '$2a$10$mZ8eHKZfOJHXYXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // password: admin123
     role: 'admin',
-    name: 'Administrador'
+    name: 'Administrador',
+    deviceId: 'device1'  // Device asignado al admin
   },
   {
     id: 2,
@@ -105,7 +106,8 @@ const users = [
     email: 'usuario@aquafeed.com',
     password: '$2a$10$mZ8eHKZfOJHXYXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // password: user123
     role: 'user',
-    name: 'Usuario Normal'
+    name: 'Usuario Normal',
+    deviceId: 'device1'  // Device asignado al usuario
   }
 ];
 
@@ -178,7 +180,8 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username, 
         role: user.role,
         email: user.email,
-        name: user.name
+        name: user.name,
+        deviceId: user.deviceId
       },
       JWT_SECRET,
       { expiresIn: '24h' }
@@ -192,7 +195,8 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        name: user.name
+        name: user.name,
+        deviceId: user.deviceId
       }
     });
 
@@ -211,7 +215,8 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
       username: req.user.username,
       email: req.user.email,
       role: req.user.role,
-      name: req.user.name
+      name: req.user.name,
+      deviceId: req.user.deviceId
     }
   });
 });

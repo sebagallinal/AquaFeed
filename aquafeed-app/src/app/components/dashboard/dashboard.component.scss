@@ -203,6 +203,52 @@
   }
 }
 
+.actions-section {
+  h2 {
+    margin-bottom: 20px;
+  }
+
+  .feeding-status {
+    margin-bottom: 20px;
+    animation: slideDown 0.3s ease;
+
+    p {
+      margin: 0;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 15px 20px;
+      border-radius: 12px;
+      text-align: center;
+
+      &.success {
+        color: #4caf50;
+        background: #e8f5e9;
+      }
+
+      &.error {
+        color: #f44336;
+        background: #ffebee;
+      }
+
+      &.loading {
+        color: #ff9800;
+        background: #fff3e0;
+      }
+    }
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .actions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -210,7 +256,7 @@
 
   .action-card {
     background: white;
-    border: none;
+    border: 2px solid transparent;
     border-radius: 12px;
     padding: 25px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
@@ -218,9 +264,26 @@
     transition: all 0.3s ease;
     text-align: center;
 
-    &:hover {
+    &:hover:not(:disabled) {
       transform: translateY(-5px);
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      border-color: #667eea;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &.feed-button {
+      &:hover:not(:disabled) {
+        border-color: #4caf50;
+      }
+
+      &.feeding {
+        background: linear-gradient(135deg, #f5f7fa 0%, #e8ebf0 100%);
+        animation: pulse 2s infinite;
+      }
     }
 
     .action-icon {
@@ -239,6 +302,13 @@
       margin: 0;
       color: #666;
       font-size: 0.95rem;
+    }
+
+    small {
+      display: block;
+      margin-top: 10px;
+      color: #999;
+      font-size: 0.85rem;
     }
   }
 }
