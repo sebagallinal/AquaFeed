@@ -48,6 +48,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(authState => {
         this.user = authState.user;
+        console.log(this.user);
         if (!authState.isAuthenticated) {
           this.router.navigate(['/login']);
         }

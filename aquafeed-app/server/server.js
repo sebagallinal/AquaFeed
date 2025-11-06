@@ -98,7 +98,7 @@ const users = [
     password: '$2a$10$mZ8eHKZfOJHXYXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // password: admin123
     role: 'admin',
     name: 'Administrador',
-    deviceId: 'device1'  // Device asignado al admin
+    deviceId: '1'  // Device asignado al admin
   },
   {
     id: 2,
@@ -107,7 +107,7 @@ const users = [
     password: '$2a$10$mZ8eHKZfOJHXYXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // password: user123
     role: 'user',
     name: 'Usuario Normal',
-    deviceId: 'device1'  // Device asignado al usuario
+    deviceId: '1'  // Device asignado al usuario
   }
 ];
 
