@@ -8,12 +8,18 @@ export interface DeviceData {
   deviceId: string;
   type: 'agua' | 'ambiente';
   data: {
+    // Datos de agua
+    tempAgua?: number;
     temperatura?: number;
     ph?: number;
+    minerales?: number;
     oxigeno?: number;
     turbidez?: number;
+    // Datos de ambiente
     humedad?: number;
     temperaturaAmbiente?: number;
+    // Metadata
+    id?: string;
     ts: string;
   };
 }

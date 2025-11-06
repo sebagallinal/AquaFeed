@@ -52,10 +52,10 @@
           <div class="sensor-data" *ngIf="getWaterData(deviceId) as waterData">
             <h4>💧 Parámetros del Agua</h4>
             <div class="sensor-readings">
-              <div class="reading-item" *ngIf="waterData.temperatura !== undefined">
+              <div class="reading-item" *ngIf="waterData.tempAgua !== undefined">
                 <span class="reading-label">🌡️ Temperatura</span>
                 <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
-                  {{ waterData.temperatura | number:'1.1-1' }}°C
+                  {{ waterData.tempAgua | number:'1.1-1' }}°C
                 </span>
               </div>
               <div class="reading-item" *ngIf="waterData.ph !== undefined">
@@ -64,16 +64,10 @@
                   {{ waterData.ph | number:'1.2-2' }}
                 </span>
               </div>
-              <div class="reading-item" *ngIf="waterData.oxigeno !== undefined">
-                <span class="reading-label">💨 Oxígeno</span>
+              <div class="reading-item" *ngIf="waterData.minerales !== undefined">
+                <span class="reading-label">⚛️ Minerales</span>
                 <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
-                  {{ waterData.oxigeno | number:'1.1-1' }} mg/L
-                </span>
-              </div>
-              <div class="reading-item" *ngIf="waterData.turbidez !== undefined">
-                <span class="reading-label">🌊 Turbidez</span>
-                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
-                  {{ waterData.turbidez | number:'1.0-0' }} NTU
+                  {{ waterData.minerales | number:'1.0-0' }}
                 </span>
               </div>
             </div>

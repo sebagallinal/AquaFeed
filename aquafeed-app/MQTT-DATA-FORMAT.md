@@ -10,18 +10,18 @@ Tu sistema Arduino/ESP32 debe publicar datos en los siguientes topics:
 **Formato JSON:**
 ```json
 {
-  "temperatura": 25.5,
+  "id": "1",
+  "tempAgua": 25.5,
   "ph": 7.2,
-  "oxigeno": 8.5,
-  "turbidez": 12
+  "minerales": 1
 }
 ```
 
 **Campos:**
-- `temperatura` (float): Temperatura del agua en °C
+- `id` (string): ID del dispositivo
+- `tempAgua` (float): Temperatura del agua en °C
 - `ph` (float): Nivel de pH del agua (0-14)
-- `oxigeno` (float): Oxígeno disuelto en mg/L
-- `turbidez` (float): Turbidez del agua en NTU
+- `minerales` (int): Nivel de minerales (0-n)
 
 ### 2. Datos de Ambiente
 **Topic:** `aquafeed/{deviceId}/ambiente`
@@ -92,10 +92,10 @@ void publishWaterData() {
   StaticJsonDocument<200> doc;
   
   // Leer sensores (reemplazar con tus valores reales)
-  doc["temperatura"] = readWaterTemperature();
+  doc["id"] = device_id;
+  doc["tempAgua"] = readWaterTemperature();
   doc["ph"] = readPH();
-  doc["oxigeno"] = readOxygen();
-  doc["turbidez"] = readTurbidity();
+  doc["minerales"] = readMinerals();
   
   // Serializar a string
   char jsonBuffer[200];
@@ -152,14 +152,9 @@ float readPH() {
   return 7.2;
 }
 
-float readOxygen() {
-  // Implementar lectura de sensor de oxígeno
-  return 8.5;
-}
-
-float readTurbidity() {
-  // Implementar lectura de sensor de turbidez
-  return 12.0;
+int readMinerals() {
+  // Implementar lectura de sensor de minerales
+  return 1;
 }
 
 float readAmbientTemperature() {
@@ -209,7 +204,7 @@ Para probar el sistema sin hardware, puedes usar `mosquitto_pub`:
 
 ```bash
 # Publicar datos de agua
-mosquitto_pub -h localhost -p 1883 -t "aquafeed/1/agua" -m '{"temperatura":25.5,"ph":7.2,"oxigeno":8.5,"turbidez":12}'
+mosquitto_pub -h localhost -p 1883 -t "aquafeed/1/agua" -m '{"id":"1","tempAgua":25.5,"ph":7.2,"minerales":1}'
 
 # Publicar datos de ambiente
 mosquitto_pub -h localhost -p 1883 -t "aquafeed/1/ambiente" -m '{"temperaturaAmbiente":22.3,"humedad":65}'
