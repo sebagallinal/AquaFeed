@@ -1,0 +1,11 @@
+# Backend (certificado CN=api)
+user api
+topic read aquafeed/+/agua
+topic read aquafeed/+/ambiente
+topic write aquafeed/+/alimentar
+
+# ESP32 id 1 (certificado CN=device1)
+user device1
+topic write aquafeed/1/agua
+topic write aquafeed/1/ambiente
+topic read aquafeed/1/alimentar

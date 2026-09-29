@@ -3,14 +3,21 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Carga variables desde aquafeed-app/.env si existe (no se versiona)
+try {
+  process.loadEnvFile(require('path').join(__dirname, '..', '.env'));
+} catch (e) {
+  if (e.code !== 'ENOENT') console.warn('⚠️ No se pudo leer .env:', e.message);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = 'UCAECE2025_Aquafeed_API_Secret_Key';
+const JWT_SECRET = process.env.JWT_SECRET || 'UCAECE2025_Aquafeed_API_Secret_Key';
 
 // Middleware
 app.use(cors({
   origin: [
-    'http://18.116.202.211',      // IP pública del servidor EC2
+    'http://35.173.129.81',       // IP pública del servidor EC2
     'http://localhost:4200',           // Desarrollo local
     'http://127.0.0.1:4200',          // Desarrollo local alternativo
     'http://aquafeed.com.ar',         // Dominio de producción
@@ -33,21 +40,27 @@ app.use(express.json());
 const fs = require('fs');
 const mqtt = require('mqtt');
 
-const MQTT_URL  = process.env.MQTT_URL  || 'mqtts://mqtt:8883';
-const MQTT_CA   = process.env.MQTT_CA   || '/run/secrets/clients_ca';
-const MQTT_CERT = process.env.MQTT_CLIENT_CERT || '/run/secrets/api_client_cert';
-const MQTT_KEY  = process.env.MQTT_CLIENT_KEY  || '/run/secrets/api_client_key';
+const MQTT_URL  = process.env.MQTT_URL  || 'mqtts://localhost:8883';
+const MQTT_CA   = process.env.MQTT_CA   || '/etc/aquafeed/mqtt/ca.crt';
+const MQTT_CERT = process.env.MQTT_CLIENT_CERT || '/etc/aquafeed/mqtt/api.crt';
+const MQTT_KEY  = process.env.MQTT_CLIENT_KEY  || '/etc/aquafeed/mqtt/api.key';
 
-// lee desde Docker Secrets
-const tlsOptions = {
-  ca:   fs.readFileSync(MQTT_CA),
-  cert: fs.readFileSync(MQTT_CERT),
-  key:  fs.readFileSync(MQTT_KEY),
-  rejectUnauthorized: true,   // valida server.crt contra tu CA
-};
+// Si faltan los certificados la API sigue funcionando (login, dashboard), sin datos MQTT
+let tlsOptions;
+try {
+  tlsOptions = {
+    ca:   fs.readFileSync(MQTT_CA),
+    cert: fs.readFileSync(MQTT_CERT),
+    key:  fs.readFileSync(MQTT_KEY),
+    rejectUnauthorized: true,   // valida server.crt contra tu CA
+  };
+} catch (e) {
+  console.error('❌ No se pudieron leer los certificados MQTT:', e.message);
+}
 
 const mqttClient = mqtt.connect(MQTT_URL, {
   ...tlsOptions,
+  manualConnect: !tlsOptions, // sin certificados no intenta conectar
   protocol: 'mqtts',
   clientId: 'api',        // debe existir cert CN=api + ACL para 'api'
   keepalive: 30,
@@ -301,6 +314,10 @@ app.post('/api/devices/:id/alimentar', authenticateToken, (req, res) => {
   // Tu ESP32 escucha exactamente este topic y el payload "alimentar"
   const topic = `aquafeed/${id}/alimentar`;
   const msg   = 'alimentar';
+
+  if (!mqttClient.connected) {
+    return res.status(503).json({ ok: false, error: 'MQTT no conectado' });
+  }
 
   mqttClient.publish(topic, msg, { qos: 0, retain: false }, (err) => {
     if (err) {

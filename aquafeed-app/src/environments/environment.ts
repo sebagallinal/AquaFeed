@@ -1,10 +1,10 @@
 // environment.ts - Configuración de desarrollo
-// NOTA: Apuntando al servidor de producción para desarrollo
-// porque el servidor local requiere certificados MQTT
+// La API se sirve bajo /api en el mismo origen (Nginx en producción,
+// proxy.conf.json con `ng serve` en desarrollo local)
 
 export const environment = {
   production: false,
-  apiUrl: 'http://aquafeed.com.ar/api',
+  apiUrl: '/api',
   frontendUrl: 'http://localhost:4200',
-  websocketUrl: 'http://aquafeed.com.ar'
+  websocketUrl: 'http://35.173.129.81'
 };

@@ -37,6 +37,11 @@ yarn-error.log
 testem.log
 /typings
 
+# Secretos y certificados
+.env
+*.key
+*.pem
+
 # System files
 .DS_Store
 Thumbs.db
