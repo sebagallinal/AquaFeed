@@ -10,6 +10,8 @@ try {
   if (e.code !== 'ENOENT') console.warn('⚠️ No se pudo leer .env:', e.message);
 }
 
+const db = require('./db'); // después de cargar .env: lee DB_* al importarse
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'UCAECE2025_Aquafeed_API_Secret_Key';
@@ -68,26 +70,38 @@ const mqttClient = mqtt.connect(MQTT_URL, {
   reconnectPeriod: 2000,
 });
 
-const deviceState = {}; // cache simple en memoria
+const deviceState = {}; // última lectura de cada device (se carga de la base al iniciar)
 
 mqttClient.on('connect', () => {
   console.log('✅ MQTT (API) conectada');
-  mqttClient.subscribe(['aquafeed/+/agua', 'aquafeed/+/ambiente'], (err, granted) => {
+  mqttClient.subscribe(['aquafeed/+/agua', 'aquafeed/+/ambiente', 'aquafeed/+/alimentado'], (err, granted) => {
     if (err) return console.error('❌ Error al suscribir:', err);
     console.log('📡 Suscripto a:', granted.map(g => `${g.topic}(q${g.qos})`).join(', '));
   });
 });
 
-mqttClient.on('message', (topic, payload) => {
+mqttClient.on('message', async (topic, payload) => {
+  const [_, id, tipo] = topic.split('/'); // aquafeed/{id}/{tipo}
+  let data;
   try {
-    const data = JSON.parse(payload.toString());
-    const [_, id, tipo] = topic.split('/'); // aquafeed/{id}/{tipo}
-    deviceState[id] ??= {};
-    deviceState[id][tipo] = { ...data, ts: new Date().toISOString() };
-    
-    console.log(`📡 Datos recibidos: Device ${id} - ${tipo}`, data);
+    data = JSON.parse(payload.toString());
   } catch (e) {
-    console.error('❌ Error parseando', topic, payload.toString(), e);
+    return console.error('❌ Error parseando', topic, payload.toString(), e.message);
+  }
+
+  const ahora = new Date();
+  try {
+    if (tipo === 'alimentado') {
+      // El ESP32 avisa cuando se alimentó con el botón físico
+      await db.saveFeeding(id, 'boton', null, ahora);
+      console.log(`🐟 Alimentación por botón: Device ${id}`);
+      return;
+    }
+    deviceState[id] ??= {};
+    deviceState[id][tipo] = { ...data, ts: ahora.toISOString() };
+    await db.saveReading(id, tipo, data, ahora);
+  } catch (e) {
+    console.error(`❌ Error guardando ${topic} en la base:`, e.message);
   }
 });
 
@@ -102,38 +116,6 @@ mqttClient.on('reconnect', () => console.log('🔁 MQTT reconectando…'));
 // ####################
 // ####################
 
-// Base de datos simulada en memoria (en producción usar una base de datos real)
-const users = [
-  {
-    id: 1,
-    username: 'admin',
-    email: 'admin@aquafeed.com',
-    password: '$2a$10$mZ8eHKZfOJHXYXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // password: admin123
-    role: 'admin',
-    name: 'Administrador',
-    deviceId: '1'  // Device asignado al admin
-  },
-  {
-    id: 2,
-    username: 'usuario',
-    email: 'usuario@aquafeed.com',
-    password: '$2a$10$mZ8eHKZfOJHXYXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // password: user123
-    role: 'user',
-    name: 'Usuario Normal',
-    deviceId: '1'  // Device asignado al usuario
-  }
-];
-
-// Función para hashear contraseñas (para crear usuarios de prueba)
-async function hashPassword(password) {
-  return await bcrypt.hash(password, 10);
-}
-
-// Inicializar contraseñas hasheadas
-async function initializeUsers() {
-  users[0].password = await hashPassword('admin123');
-  users[1].password = await hashPassword('user123');
-}
 
 // Middleware para verificar JWT
 const authenticateToken = (req, res, next) => {
@@ -173,18 +155,20 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Buscar usuario
-    const user = users.find(u => u.username === username || u.email === username);
-    
-    if (!user) {
+    const row = await db.findUserByLogin(username);
+
+    if (!row) {
       return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
     // Verificar contraseña
-    const validPassword = await bcrypt.compare(password, user.password);
-    
+    const validPassword = await bcrypt.compare(password, row.password_hash);
+
     if (!validPassword) {
       return res.status(401).json({ message: 'Credenciales inválidas' });
     }
+
+    const user = db.toApiUser(row);
 
     // Generar JWT
     const token = jwt.sign(
@@ -235,14 +219,18 @@ app.get('/api/auth/verify', authenticateToken, (req, res) => {
 });
 
 // Ruta protegida para usuarios autenticados
-app.get('/api/dashboard', authenticateToken, (req, res) => {
+app.get('/api/dashboard', authenticateToken, async (req, res) => {
+  const [[{ totalFeedings }]] = await db.pool.query('SELECT COUNT(*) AS totalFeedings FROM alimentaciones');
+  const [[{ activeDevices }]] = await db.pool.query(
+    'SELECT COUNT(DISTINCT dispositivo_id) AS activeDevices FROM lecturas_agua WHERE registrado_en > UTC_TIMESTAMP() - INTERVAL 1 HOUR'
+  );
   res.json({
     message: `Bienvenido al dashboard, ${req.user.name}!`,
     user: req.user,
     data: {
       stats: {
-        totalFeedings: 45,
-        activeDevices: 8,
+        totalFeedings,
+        activeDevices,
         lastUpdate: new Date().toISOString()
       }
     }
@@ -250,12 +238,12 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
 });
 
 // Ruta protegida solo para administradores
-app.get('/api/admin/console', authenticateToken, requireAdmin, (req, res) => {
+app.get('/api/admin/console', authenticateToken, requireAdmin, async (req, res) => {
   res.json({
     message: `Bienvenido a la consola de administración, ${req.user.name}!`,
     user: req.user,
     data: {
-      totalUsers: users.length,
+      totalUsers: await db.countUsers(),
       systemHealth: 'OK',
       serverUptime: process.uptime(),
       adminFeatures: [
@@ -269,16 +257,8 @@ app.get('/api/admin/console', authenticateToken, requireAdmin, (req, res) => {
 });
 
 // Ruta para obtener todos los usuarios (solo admin)
-app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
-  const usersWithoutPasswords = users.map(user => ({
-    id: user.id,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    name: user.name
-  }));
-  
-  res.json({ users: usersWithoutPasswords });
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+  res.json({ users: await db.listUsers() });
 });
 
 // Ruta de logout (opcional, principalmente para el frontend)
@@ -319,13 +299,50 @@ app.post('/api/devices/:id/alimentar', authenticateToken, (req, res) => {
     return res.status(503).json({ ok: false, error: 'MQTT no conectado' });
   }
 
-  mqttClient.publish(topic, msg, { qos: 0, retain: false }, (err) => {
+  mqttClient.publish(topic, msg, { qos: 0, retain: false }, async (err) => {
     if (err) {
       console.error('❌ Error publicando alimentar:', err);
       return res.status(500).json({ ok: false, error: 'MQTT publish error' });
     }
+    try {
+      await db.saveFeeding(id, 'web', req.user.id);
+    } catch (e) {
+      console.error('❌ Error registrando alimentación:', e.message);
+    }
     res.json({ ok: true, topic, msg });
   });
+});
+
+// Un usuario común solo puede consultar el historial de su dispositivo
+const canAccessDevice = (user, id) => user.role === 'admin' || String(user.deviceId) === String(id);
+
+// Historial de lecturas: /api/devices/1/history?tipo=agua&horas=24
+//   tipo: agua | ambiente   horas: ventana hacia atrás (default 24, máx 720)
+//   o bien desde/hasta en ISO 8601; limit: máx filas (default 5000)
+app.get('/api/devices/:id/history', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  if (!canAccessDevice(req.user, id)) return res.status(403).json({ message: 'Sin acceso a este dispositivo' });
+
+  const tipo = req.query.tipo || 'agua';
+  if (!['agua', 'ambiente'].includes(tipo)) return res.status(400).json({ message: 'tipo debe ser agua o ambiente' });
+
+  const horas = Math.min(Number(req.query.horas) || 24, 720);
+  const hasta = req.query.hasta ? new Date(req.query.hasta) : new Date();
+  const desde = req.query.desde ? new Date(req.query.desde) : new Date(hasta.getTime() - horas * 3600 * 1000);
+  if (isNaN(desde) || isNaN(hasta)) return res.status(400).json({ message: 'Fechas inválidas' });
+  const limit = Math.min(Number(req.query.limit) || 5000, 20000);
+
+  const lecturas = await db.getHistory(id, tipo, desde, hasta, limit);
+  res.json({ id, tipo, desde, hasta, total: lecturas.length, lecturas });
+});
+
+// Últimas alimentaciones: /api/devices/1/feedings?limit=50
+app.get('/api/devices/:id/feedings', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  if (!canAccessDevice(req.user, id)) return res.status(403).json({ message: 'Sin acceso a este dispositivo' });
+
+  const limit = Math.min(Number(req.query.limit) || 50, 1000);
+  res.json({ id, alimentaciones: await db.getFeedings(id, limit) });
 });
 
 // Middleware de manejo de errores
@@ -335,8 +352,11 @@ app.use((err, req, res, next) => {
 });
 
 // Inicializar servidor
-initializeUsers()
-  .then(() => {
+db.init()
+  .then(() => db.getLatestState())
+  .then((state) => {
+    Object.assign(deviceState, state);
+    console.log('🗄️  Base de datos conectada');
     app.listen(PORT, () => {
       console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
       console.log(`📡 API disponible en http://localhost:${PORT}/api`);
@@ -346,7 +366,7 @@ initializeUsers()
     });
   })
   .catch((err) => {
-    console.error('❌ Error al inicializar usuarios:', err);
+    console.error('❌ Error al inicializar la base de datos:', err);
     process.exit(1); // <- opcional, para indicar que hubo error real
   });
 

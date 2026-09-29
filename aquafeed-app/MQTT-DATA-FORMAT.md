@@ -40,6 +40,31 @@ Tu sistema Arduino/ESP32 debe publicar datos en los siguientes topics:
 - `tempAmb` (float): Temperatura ambiente en °C
 - `humAmb` (int): Humedad ambiente en %
 
+### 3. Alimentación por botón físico
+**Topic:** `aquafeed/{deviceId}/alimentado`
+
+**Formato JSON:**
+```json
+{
+  "id": "1",
+  "origen": "boton"
+}
+```
+
+El ESP32 lo publica cada vez que se alimenta con el botón físico, para que quede registrado
+en la base de datos (las alimentaciones pedidas desde la web las registra la API).
+
+### 4. Comando alimentar (servidor → ESP32)
+**Topic:** `aquafeed/{deviceId}/alimentar` — payload `alimentar`
+
+## Almacenamiento
+
+Todo lo que llega por MQTT se guarda en MariaDB (tablas `lecturas_agua`, `lecturas_ambiente`
+y `alimentaciones`, ver `server/schema.sql`). Historial por API:
+
+- `GET /api/devices/{id}/history?tipo=agua&horas=24` (o `desde`/`hasta` en ISO 8601)
+- `GET /api/devices/{id}/feedings?limit=50`
+
 ## Ejemplo de Código Arduino/ESP32
 
 ```cpp

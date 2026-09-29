@@ -2,10 +2,12 @@
 user api
 topic read aquafeed/+/agua
 topic read aquafeed/+/ambiente
+topic read aquafeed/+/alimentado
 topic write aquafeed/+/alimentar
 
 # ESP32 id 1 (certificado CN=device1)
 user device1
 topic write aquafeed/1/agua
 topic write aquafeed/1/ambiente
+topic write aquafeed/1/alimentado
 topic read aquafeed/1/alimentar

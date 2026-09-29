@@ -57,6 +57,9 @@ if [ ! -f "$ENV_FILE" ]; then
   chmod 600 "$ENV_FILE"
 fi
 
+# Base de datos (MariaDB)
+"$DEPLOY_DIR/setup-db.sh"
+
 # Nginx
 install -d -o "$APP_USER" -g "$APP_USER" /var/www/aquafeed
 install -m 644 "$DEPLOY_DIR/nginx-aquafeed.conf" /etc/nginx/sites-available/aquafeed
