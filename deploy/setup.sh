@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Configuración inicial del servidor (Ubuntu). Ejecutar una sola vez desde el repo clonado:
-#   sudo ./deploy/setup.sh <IP-publica-o-dominio>
+#   sudo ./deploy/setup.sh <dominio-o-IP> [otros nombres/IPs para el certificado MQTT...]
 set -euo pipefail
 
-HOST="${1:?Uso: sudo $0 <IP-publica-o-dominio>}"
+HOSTS=("$@")
+[ ${#HOSTS[@]} -gt 0 ] || { echo "Uso: sudo $0 <dominio-o-IP>..." >&2; exit 1; }
 APP_USER="${SUDO_USER:-ubuntu}"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DEPLOY_DIR="$REPO_DIR/deploy"
@@ -28,7 +29,7 @@ command -v pm2 >/dev/null || npm install -g pm2
 
 # Certificados MQTT (solo se generan si no existen)
 PKI=/etc/aquafeed/pki
-[ -f "$PKI/server.crt" ] || "$DEPLOY_DIR/gen-certs.sh" server "$HOST"
+[ -f "$PKI/server.crt" ] || "$DEPLOY_DIR/gen-certs.sh" server "${HOSTS[@]}"
 [ -f "$PKI/api.crt" ]    || "$DEPLOY_DIR/gen-certs.sh" client api
 [ -f "$PKI/device1.crt" ] || "$DEPLOY_DIR/gen-certs.sh" client device1
 

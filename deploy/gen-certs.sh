@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Genera la CA y los certificados MQTT (mTLS).
-#   sudo ./gen-certs.sh server <IP-o-dominio>   -> CA (si no existe) + certificado del broker
+#   sudo ./gen-certs.sh server <dominio-o-IP>... -> CA (si no existe) + certificado del broker
+#                                                  (el primer nombre es el CN; todos van al SAN)
 #   sudo ./gen-certs.sh client <CN>             -> certificado de cliente (api, device1, device2...)
 # La CA y todos los certificados quedan en /etc/aquafeed/pki (solo root).
 set -euo pipefail
@@ -19,12 +20,16 @@ fi
 
 case "${1:-}" in
   server)
-    HOST="${2:?Falta IP o dominio del servidor}"
-    if [[ "$HOST" =~ ^[0-9.]+$ ]]; then
-      SAN="IP:$HOST,DNS:$HOST,DNS:localhost,IP:127.0.0.1"
-    else
-      SAN="DNS:$HOST,DNS:localhost,IP:127.0.0.1"
-    fi
+    shift
+    HOST="${1:?Falta IP o dominio del servidor}"
+    SAN="DNS:localhost,IP:127.0.0.1"
+    for H in "$@"; do
+      if [[ "$H" =~ ^[0-9.]+$ ]]; then
+        SAN="$SAN,IP:$H,DNS:$H"
+      else
+        SAN="$SAN,DNS:$H"
+      fi
+    done
     openssl genrsa -out server.key 2048
     openssl req -new -key server.key -subj "/CN=$HOST" -out server.csr
     openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
@@ -44,7 +49,7 @@ case "${1:-}" in
     echo "Certificado de cliente: $PKI/$CN.crt / $PKI/$CN.key"
     ;;
   *)
-    echo "Uso: $0 server <IP-o-dominio> | client <CN>" >&2
+    echo "Uso: $0 server <dominio-o-IP>... | client <CN>" >&2
     exit 1
     ;;
 esac
