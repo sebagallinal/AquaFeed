@@ -13,6 +13,7 @@ export interface DeviceData {
     temperatura?: number;
     ph?: number;
     minerales?: number;
+    tdsPpm?: number;
     oxigeno?: number;
     turbidez?: number;
     // Datos de ambiente

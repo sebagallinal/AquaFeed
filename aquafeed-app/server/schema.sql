@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS lecturas_agua (
   CONSTRAINT fk_agua_dispositivo FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- TDS en ppm (firmware v1). "minerales" queda para las lecturas del firmware anterior.
+ALTER TABLE lecturas_agua ADD COLUMN IF NOT EXISTS tds_ppm DECIMAL(7,2) NULL AFTER minerales;
+
 CREATE TABLE IF NOT EXISTS lecturas_ambiente (
   id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
   dispositivo_id  VARCHAR(32)  NOT NULL,

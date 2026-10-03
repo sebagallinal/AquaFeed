@@ -82,8 +82,8 @@ async function saveReading(deviceId, tipo, data, fecha) {
   await ensureDevice(deviceId);
   if (tipo === 'agua') {
     await pool.query(
-      'INSERT INTO lecturas_agua (dispositivo_id, temp_agua, ph, minerales, registrado_en) VALUES (?, ?, ?, ?, ?)',
-      [deviceId, num(data.tempAgua), num(data.ph), num(data.minerales), fecha]
+      'INSERT INTO lecturas_agua (dispositivo_id, temp_agua, ph, minerales, tds_ppm, registrado_en) VALUES (?, ?, ?, ?, ?, ?)',
+      [deviceId, num(data.tempAgua), num(data.ph), num(data.minerales), num(data.tdsPpm), fecha]
     );
   } else if (tipo === 'ambiente') {
     await pool.query(
@@ -104,7 +104,7 @@ async function saveFeeding(deviceId, origen, usuarioId = null, fecha = new Date(
 // Historial de lecturas entre dos fechas, en el mismo formato que publica el ESP32
 async function getHistory(deviceId, tipo, desde, hasta, limit) {
   const sql = tipo === 'agua'
-    ? `SELECT temp_agua AS tempAgua, ph, minerales, registrado_en AS ts
+    ? `SELECT temp_agua AS tempAgua, ph, minerales, tds_ppm AS tdsPpm, registrado_en AS ts
          FROM lecturas_agua WHERE dispositivo_id = ? AND registrado_en BETWEEN ? AND ?
          ORDER BY registrado_en DESC LIMIT ?`
     : `SELECT temp_amb AS tempAmb, hum_amb AS humAmb, registrado_en AS ts
@@ -134,7 +134,8 @@ async function getLatestState() {
   );
   for (const r of agua) {
     (state[r.dispositivo_id] ??= {}).agua = {
-      id: r.dispositivo_id, tempAgua: r.temp_agua, ph: r.ph, minerales: r.minerales, ts: r.registrado_en.toISOString(),
+      id: r.dispositivo_id, tempAgua: r.temp_agua, ph: r.ph, minerales: r.minerales, tdsPpm: r.tds_ppm,
+      ts: r.registrado_en.toISOString(),
     };
   }
   const [amb] = await pool.query(

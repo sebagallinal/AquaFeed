@@ -64,10 +64,16 @@
                   {{ waterData.ph | number:'1.2-2' }}
                 </span>
               </div>
-              <div class="reading-item" *ngIf="waterData.minerales !== undefined">
+              <div class="reading-item" *ngIf="waterData.minerales != null">
                 <span class="reading-label">⚛️ Minerales</span>
                 <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
                   {{ waterData.minerales | number:'1.0-0' }}
+                </span>
+              </div>
+              <div class="reading-item" *ngIf="waterData.tdsPpm != null">
+                <span class="reading-label">⚛️ TDS</span>
+                <span class="reading-value" [class.recent]="isDataRecent(deviceId, 'agua')">
+                  {{ waterData.tdsPpm | number:'1.0-0' }} ppm
                 </span>
               </div>
             </div>

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // Carga variables desde aquafeed-app/.env si existe (no se versiona)
 try {
@@ -72,16 +73,56 @@ const mqttClient = mqtt.connect(MQTT_URL, {
 
 const deviceState = {}; // última lectura de cada device (se carga de la base al iniciar)
 
+// Vista en vivo: deviceState se actualiza con cada mensaje (el ESP32 publica cada 5 s).
+// Reportes: a la base va una sola lectura por dispositivo y tipo cada SAVE_INTERVAL_MS.
+const SAVE_INTERVAL_MS = Number(process.env.SAVE_INTERVAL_MS) || 5 * 60 * 1000;
+const lastSaved = {}; // `${id}/${tipo}` -> ms de la última lectura guardada
+
+async function registrarLectura(id, tipo, data, ahora) {
+  deviceState[id] ??= {};
+  deviceState[id][tipo] = { ...data, ts: ahora.toISOString() };
+
+  const key = `${id}/${tipo}`;
+  if (ahora.getTime() - (lastSaved[key] ?? 0) < SAVE_INTERVAL_MS) return;
+  lastSaved[key] = ahora.getTime();
+  await db.saveReading(id, tipo, data, ahora);
+}
+
 mqttClient.on('connect', () => {
   console.log('✅ MQTT (API) conectada');
-  mqttClient.subscribe(['aquafeed/+/agua', 'aquafeed/+/ambiente', 'aquafeed/+/alimentado'], (err, granted) => {
+  mqttClient.subscribe([
+    'aquafeed/+/agua', 'aquafeed/+/ambiente', 'aquafeed/+/alimentado',   // firmware anterior
+    'aquafeed/v1/+/telemetry', 'aquafeed/v1/+/status', 'aquafeed/v1/+/event', 'aquafeed/v1/+/ack',
+  ], (err, granted) => {
     if (err) return console.error('❌ Error al suscribir:', err);
     console.log('📡 Suscripto a:', granted.map(g => `${g.topic}(q${g.qos})`).join(', '));
   });
 });
 
+// Firmware v1: aquafeed/v1/{id}/{tipo}, con id = af- + MAC (ver firmware/README.md)
+async function onMessageV1(id, tipo, data, ahora) {
+  if (tipo === 'telemetry') {
+    // Mismo formato que el firmware anterior, para que el dashboard no distinga versiones
+    const agua = { id, tempAgua: data.waterTempC ?? null, ph: data.ph ?? null, tdsPpm: data.tdsPpm ?? null };
+    await registrarLectura(id, 'agua', agua, ahora);
+  } else if (tipo === 'status') {
+    deviceState[id] ??= {};
+    deviceState[id].status = { ...data, ts: ahora.toISOString() };
+  } else if (tipo === 'event') {
+    // Las alimentaciones pedidas desde la web ya se registran al enviar el comando
+    if (data.type === 'feed' && data.source === 'button') {
+      await db.saveFeeding(id, 'boton', null, ahora);
+      console.log(`🐟 Alimentación por botón: Device ${id}`);
+    }
+  } else if (tipo === 'ack') {
+    console.log(`📬 Ack de ${id}: cmd ${data.cmdId} ${data.ok ? 'ok' : 'falló'}`);
+  }
+}
+
 mqttClient.on('message', async (topic, payload) => {
-  const [_, id, tipo] = topic.split('/'); // aquafeed/{id}/{tipo}
+  const partes = topic.split('/');
+  const esV1 = partes[1] === 'v1';
+  const [id, tipo] = esV1 ? partes.slice(2) : partes.slice(1); // aquafeed/[v1/]{id}/{tipo}
   let data;
   try {
     data = JSON.parse(payload.toString());
@@ -91,15 +132,14 @@ mqttClient.on('message', async (topic, payload) => {
 
   const ahora = new Date();
   try {
+    if (esV1) return await onMessageV1(id, tipo, data, ahora);
     if (tipo === 'alimentado') {
       // El ESP32 avisa cuando se alimentó con el botón físico
       await db.saveFeeding(id, 'boton', null, ahora);
       console.log(`🐟 Alimentación por botón: Device ${id}`);
       return;
     }
-    deviceState[id] ??= {};
-    deviceState[id][tipo] = { ...data, ts: ahora.toISOString() };
-    await db.saveReading(id, tipo, data, ahora);
+    await registrarLectura(id, tipo, data, ahora);
   } catch (e) {
     console.error(`❌ Error guardando ${topic} en la base:`, e.message);
   }
@@ -291,15 +331,20 @@ app.get('/api/devices/all', authenticateToken, (req, res) => {
 app.post('/api/devices/:id/alimentar', authenticateToken, (req, res) => {
   const { id } = req.params;
 
-  // Tu ESP32 escucha exactamente este topic y el payload "alimentar"
-  const topic = `aquafeed/${id}/alimentar`;
-  const msg   = 'alimentar';
+  // Firmware v1 (id af-...): comando JSON con cmdId y porciones, que el ESP32 confirma con un ack.
+  // Firmware anterior: escucha aquafeed/{id}/alimentar con el payload "alimentar".
+  const esV1 = id.startsWith('af-');
+  const portions = Math.min(Math.max(Number(req.body?.portions) || 1, 1), 10);
+  const topic = esV1 ? `aquafeed/v1/${id}/cmd` : `aquafeed/${id}/alimentar`;
+  const msg   = esV1
+    ? JSON.stringify({ cmdId: crypto.randomUUID(), type: 'feed', portions })
+    : 'alimentar';
 
   if (!mqttClient.connected) {
     return res.status(503).json({ ok: false, error: 'MQTT no conectado' });
   }
 
-  mqttClient.publish(topic, msg, { qos: 0, retain: false }, async (err) => {
+  mqttClient.publish(topic, msg, { qos: esV1 ? 1 : 0, retain: false }, async (err) => {
     if (err) {
       console.error('❌ Error publicando alimentar:', err);
       return res.status(500).json({ ok: false, error: 'MQTT publish error' });

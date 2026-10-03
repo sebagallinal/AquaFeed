@@ -1,0 +1,5 @@
+# Secretos del firmware (certificado y clave de cada ESP32). Nunca van al repositorio.
+**/config.h
+!**/config.example.h
+*.pem
+*.key

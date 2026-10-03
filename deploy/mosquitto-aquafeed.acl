@@ -4,10 +4,25 @@ topic read aquafeed/+/agua
 topic read aquafeed/+/ambiente
 topic read aquafeed/+/alimentado
 topic write aquafeed/+/alimentar
+topic read aquafeed/v1/+/telemetry
+topic read aquafeed/v1/+/status
+topic read aquafeed/v1/+/event
+topic read aquafeed/v1/+/ack
+topic write aquafeed/v1/+/cmd
+topic write aquafeed/v1/+/config
 
-# ESP32 id 1 (certificado CN=device1)
+# ESP32 id 1 (certificado CN=device1), firmware anterior
 user device1
 topic write aquafeed/1/agua
 topic write aquafeed/1/ambiente
 topic write aquafeed/1/alimentado
 topic read aquafeed/1/alimentar
+
+# Firmware v1: el CN del certificado es el ID del dispositivo (af- + MAC) y cada uno
+# solo accede a sus propios topics. Un dispositivo nuevo no requiere tocar este archivo.
+pattern write aquafeed/v1/%u/telemetry
+pattern write aquafeed/v1/%u/status
+pattern write aquafeed/v1/%u/event
+pattern write aquafeed/v1/%u/ack
+pattern read aquafeed/v1/%u/cmd
+pattern read aquafeed/v1/%u/config
