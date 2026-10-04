@@ -410,14 +410,17 @@ app.use((err, req, res, next) => {
 db.init()
   .then(() => db.getLatestState())
   .then((state) => {
-    Object.assign(deviceState, state);
+    // Lo que ya llegó por MQTT mientras se abría la base (p. ej. el status retenido) tiene prioridad
+    for (const [id, guardado] of Object.entries(state)) {
+      deviceState[id] = { ...guardado, ...deviceState[id] };
+    }
     console.log('🗄️  Base de datos conectada');
     app.listen(PORT, () => {
       console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
       console.log(`📡 API disponible en http://localhost:${PORT}/api`);
       console.log('👤 Usuarios de prueba:');
       console.log('   Admin: username=admin, password=admin123');
-      console.log('   Usuario: username=usuario, password=user123');
+      console.log('   Usuario: username=usuario, password=user1234');
     });
   })
   .catch((err) => {
