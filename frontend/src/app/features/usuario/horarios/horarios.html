@@ -1,0 +1,49 @@
+<section class="af-page">
+  <a class="af-back" [routerLink]="['/app/dispositivos', id()]">Volver a la pecera</a>
+
+  @if (detalle() === undefined) {
+    <p>Cargando horarios…</p>
+  } @else if (detalle(); as pecera) {
+    <header class="af-page-head">
+      <p class="af-kicker">{{ pecera.dispositivo.nombre }}</p>
+      <h1>Horarios</h1>
+      <p>
+        Hasta 8 tomas por semana, en hora de la pecera. Editarlas y bajar la config al dispositivo
+        va a estar disponible con el backend.
+      </p>
+    </header>
+
+    @if (pecera.horarios.length === 0) {
+      <div class="af-empty">
+        <h2>Esta pecera no tiene horarios</h2>
+        <p>Cuando se puedan editar, vas a poder armar la semana desde acá.</p>
+      </div>
+    } @else {
+      <ul class="af-schedule">
+        @for (horario of pecera.horarios; track horario.id) {
+          <li [class.af-schedule__off]="!horario.enabled">
+            <p class="af-schedule__time">{{ horario.time }}</p>
+            <div>
+              <p class="af-chips" aria-label="Días">
+                @for (dia of [1, 2, 3, 4, 5, 6, 7]; track dia) {
+                  <span class="af-chip" [class.af-chip--on]="horario.days.includes(dia)">
+                    {{ etiquetaDia(dia) }}
+                  </span>
+                }
+              </p>
+              <p class="af-schedule__dose">
+                {{ textoPorciones(horario.portions) }}
+                · {{ horario.enabled ? 'Activo' : 'Pausado' }}
+              </p>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <div class="af-empty">
+      <h1>No encontramos esa pecera</h1>
+      <p>Puede que no exista o que no sea tuya.</p>
+    </div>
+  }
+</section>

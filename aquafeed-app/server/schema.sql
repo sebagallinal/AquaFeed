@@ -19,6 +19,12 @@ CREATE TABLE IF NOT EXISTS usuarios (
   CONSTRAINT fk_usuarios_dispositivo FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Frontend nuevo: un dispositivo (pecera) tiene un solo dueño y un usuario puede tener varias.
+-- usuarios.dispositivo_id queda para la API anterior. Sin FK a usuarios para no cruzar las dos tablas.
+ALTER TABLE dispositivos ADD COLUMN IF NOT EXISTS usuario_id INT NULL AFTER nombre;
+ALTER TABLE dispositivos ADD COLUMN IF NOT EXISTS especie_id VARCHAR(64) NULL AFTER usuario_id;  -- id del perfil de especie
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS activo TINYINT(1) NOT NULL DEFAULT 1 AFTER nombre;
+
 CREATE TABLE IF NOT EXISTS lecturas_agua (
   id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
   dispositivo_id  VARCHAR(32)  NOT NULL,

@@ -1,0 +1,70 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Panel</p>
+    <h1>Hola, {{ nombre() }}</h1>
+    <p>Así están tus peceras ahora. Los valores se actualizan cada 5 segundos.</p>
+  </header>
+
+  @if (peceras().length === 0) {
+    <div class="af-empty">
+      <h2>Todavía no vinculaste una pecera</h2>
+      <p>
+        Cuando el alta de dispositivos esté en el backend, vas a poder reclamar la tuya con el
+        código de la etiqueta.
+      </p>
+    </div>
+  } @else {
+    <div class="af-grid">
+      @for (pecera of peceras(); track pecera.dispositivo.id) {
+        <article class="af-tank">
+          <a class="af-tank__main" [routerLink]="['/app/dispositivos', pecera.dispositivo.id]">
+            <header class="af-tank__head">
+              <div>
+                <h2>{{ pecera.dispositivo.nombre }}</h2>
+                <p>{{ pecera.especie?.nombre ?? 'Sin especie' }}</p>
+              </div>
+              <span
+                class="af-badge"
+                [class.af-badge--on]="pecera.dispositivo.online"
+                [class.af-badge--off]="!pecera.dispositivo.online"
+              >
+                {{ pecera.dispositivo.online ? 'En línea' : 'Sin conexión' }}
+              </span>
+            </header>
+            <dl class="af-metrics">
+              <div>
+                <dt>pH</dt>
+                <dd>{{ textoPh(pecera.lectura?.ph ?? null) }}</dd>
+              </div>
+              <div>
+                <dt>Temperatura</dt>
+                <dd>{{ textoTemp(pecera.lectura?.waterTempC ?? null) }}</dd>
+              </div>
+              <div>
+                <dt>TDS</dt>
+                <dd>{{ textoTds(pecera.lectura?.tdsPpm ?? null) }}</dd>
+              </div>
+            </dl>
+            <p class="af-tank__meta">
+              <mat-icon aria-hidden="true">schedule</mat-icon>
+              <span>
+                <span class="af-label">Próxima alimentación</span>
+                {{ pecera.proxima?.etiqueta ?? 'Sin horarios activos' }}
+              </span>
+            </p>
+            <p class="af-tank__when">
+              {{ pecera.dispositivo.online ? 'Actualizado' : 'Última lectura' }}
+              {{ haceCuanto(pecera.lectura?.ts ?? null) }}
+            </p>
+          </a>
+          <div class="af-tank__actions">
+            <button type="button" class="af-btn af-btn--feed" (click)="pedir(pecera)">
+              <mat-icon aria-hidden="true">restaurant</mat-icon>
+              Alimentar ahora
+            </button>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

@@ -1,0 +1,46 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Operación</p>
+    <h1>Alertas y salud</h1>
+    <p>
+      Alertas de todas las peceras, más el estado de los servicios.
+    </p>
+  </header>
+
+  @if (resumen(); as salud) {
+    <ul class="af-health">
+      @for (servicio of salud.servicios; track servicio.nombre) {
+        <li>
+          <div>
+            <strong>{{ servicio.nombre }}</strong>
+            <p>{{ servicio.detalle }}</p>
+          </div>
+          @if (servicio.estado === 'ok') {
+            <span class="af-badge af-badge--on">Conectado</span>
+          } @else {
+            <span class="af-badge af-badge--neutral">Sin conectar</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+
+  <h2>Alertas</h2>
+  @if (alertas().length === 0) {
+    <div class="af-empty">
+      <h3>No hay alertas abiertas</h3>
+    </div>
+  } @else {
+    <ul class="af-alerts">
+      @for (alerta of alertas(); track alerta.id) {
+        <li>
+          <div>
+            <p class="af-kicker">{{ alerta.nombrePecera }} · {{ etiquetaEstado(alerta.estado) }}</p>
+            <h3>{{ alerta.mensaje }}</h3>
+            <p class="af-tank__when">{{ fechaHora(alerta.abiertaEn) }}</p>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</section>

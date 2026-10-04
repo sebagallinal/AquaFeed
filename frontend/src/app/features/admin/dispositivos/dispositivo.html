@@ -1,0 +1,59 @@
+<section class="af-page">
+  <a class="af-back" routerLink="/admin/dispositivos">Volver a dispositivos</a>
+
+  @if (dispositivo() === undefined) {
+    <p>Cargando dispositivo…</p>
+  } @else if (dispositivo(); as placa) {
+    <header class="af-page-head">
+      <p class="af-kicker">{{ placa.estado === 'claimed' ? 'Vinculado' : 'Sin vincular' }}</p>
+      <h1>{{ placa.nombre }}</h1>
+      <p>
+        <code>{{ placa.id }}</code>
+      </p>
+    </header>
+    <dl class="af-facts">
+      <div>
+        <dt>Dueño</dt>
+        <dd>{{ placa.duenoNombre ?? 'Nadie' }}</dd>
+      </div>
+      <div>
+        <dt>Correo</dt>
+        <dd>{{ placa.duenoEmail ?? '—' }}</dd>
+      </div>
+      <div>
+        <dt>Especie</dt>
+        <dd>{{ placa.especieNombre ?? 'Sin elegir' }}</dd>
+      </div>
+      <div>
+        <dt>Conexión</dt>
+        <dd>{{ placa.online ? 'En línea' : 'Sin conexión' }}</dd>
+      </div>
+      <div>
+        <dt>Firmware</dt>
+        <dd>{{ placa.fw ?? 'Sin reportar' }}</dd>
+      </div>
+      <div>
+        <dt>Config aplicada</dt>
+        <dd>v{{ placa.configVersion }}</dd>
+      </div>
+      <div>
+        <dt>Última vez visto</dt>
+        <dd>{{ placa.lastSeen ? fechaHora(placa.lastSeen) : 'Nunca' }}</dd>
+      </div>
+      <div>
+        <dt>Zona horaria</dt>
+        <dd>{{ placa.tz }}</dd>
+      </div>
+    </dl>
+    <aside class="af-note">
+      <p>
+        Regenerar el código, reasignar y los comandos de mantenimiento (ping, reinicio) quedan para
+        el backend. Desde acá no se alimenta una pecera ajena.
+      </p>
+    </aside>
+  } @else {
+    <div class="af-empty">
+      <h1>No encontramos ese dispositivo</h1>
+    </div>
+  }
+</section>

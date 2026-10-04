@@ -1,0 +1,33 @@
+<section class="af-page">
+  <a class="af-back" routerLink="/admin/usuarios">Volver a usuarios</a>
+
+  @if (usuario() === undefined) {
+    <p>Cargando usuario…</p>
+  } @else if (usuario(); as cuenta) {
+    <header class="af-page-head">
+      <p class="af-kicker">{{ cuenta.rol === 'admin' ? 'Admin' : 'Usuario' }}</p>
+      <h1>{{ cuenta.nombre }}</h1>
+      <p>{{ cuenta.email }}</p>
+    </header>
+    <dl class="af-facts">
+      <div>
+        <dt>Estado</dt>
+        <dd>{{ cuenta.activo ? 'Activo' : 'Deshabilitado' }}</dd>
+      </div>
+      <div>
+        <dt>Rol</dt>
+        <dd>{{ cuenta.rol === 'admin' ? 'Administración' : 'Dueño de peceras' }}</dd>
+      </div>
+    </dl>
+    <aside class="af-note">
+      <p>
+        Cambiar el rol, deshabilitar la cuenta o forzar un reseteo de contraseña queda para el
+        backend.
+      </p>
+    </aside>
+  } @else {
+    <div class="af-empty">
+      <h1>No encontramos ese usuario</h1>
+    </div>
+  }
+</section>

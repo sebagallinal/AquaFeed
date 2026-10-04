@@ -1,0 +1,34 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Avisos</p>
+    <h1>Alertas</h1>
+    <p>
+      Cuando el backend evalúe los rangos, las alertas de agua van a llegar acá. Estas son de
+      demostración.
+    </p>
+  </header>
+
+  @if (alertas().length === 0) {
+    <div class="af-empty">
+      <h2>No hay alertas</h2>
+      <p>Si una pecera se queda sin conexión o se saltea una toma, lo vas a ver en esta lista.</p>
+    </div>
+  } @else {
+    <ul class="af-alerts">
+      @for (alerta of alertas(); track alerta.id) {
+        <li>
+          <div>
+            <p class="af-kicker">{{ alerta.nombrePecera }} · {{ etiquetaEstado(alerta.estado) }}</p>
+            <h2>{{ alerta.mensaje }}</h2>
+            <p class="af-tank__when">{{ fechaHora(alerta.abiertaEn) }}</p>
+          </div>
+          @if (alerta.estado === 'abierta') {
+            <button type="button" class="af-btn af-btn--ghost" (click)="reconocer(alerta)">
+              Reconocer
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -21,7 +21,14 @@ const pool = mysql.createPool({ ...config, connectionLimit: 5 });
 async function init() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   const conn = await mysql.createConnection({ ...config, multipleStatements: true });
+  let sinDuenos;
   try {
+    // Antes de aplicar el esquema: ¿la base todavía no tiene dueño por dispositivo?
+    const [[{ c }]] = await conn.query(
+      `SELECT COUNT(*) AS c FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'dispositivos' AND column_name = 'usuario_id'`
+    );
+    sinDuenos = c === 0;
     await conn.query(schema);
   } finally {
     await conn.end();
@@ -34,9 +41,17 @@ async function init() {
       `INSERT INTO usuarios (username, email, password_hash, rol, nombre, dispositivo_id) VALUES
         ('admin',   'admin@aquafeed.com',   ?, 'admin', 'Administrador',  '1'),
         ('usuario', 'usuario@aquafeed.com', ?, 'user',  'Usuario Normal', '1')`,
-      [await bcrypt.hash('admin123', 10), await bcrypt.hash('user123', 10)]
+      [await bcrypt.hash('admin123', 10), await bcrypt.hash('user1234', 10)]
     );
-    console.log('🗄️  Base inicializada con usuarios de prueba (admin/admin123, usuario/user123)');
+    console.log('🗄️  Base inicializada con usuarios de prueba (admin/admin123, usuario/user1234)');
+  }
+
+  // Una sola vez: el dueño de cada dispositivo sale del usuario común que lo tenía asignado
+  if (sinDuenos) {
+    await pool.query(
+      `UPDATE dispositivos d JOIN usuarios u ON u.dispositivo_id = d.id AND u.rol = 'user'
+          SET d.usuario_id = u.id`
+    );
   }
 }
 
@@ -60,6 +75,38 @@ async function findUserByLogin(login) {
 async function listUsers() {
   const [rows] = await pool.query('SELECT * FROM usuarios ORDER BY id');
   return rows.map(toApiUser);
+}
+
+// Usuario en el formato del frontend nuevo (frontend/src/app/shared/models/usuario.model.ts)
+function toUsuario(row) {
+  return { id: String(row.id), nombre: row.nombre, email: row.email, rol: row.rol, activo: !!row.activo };
+}
+
+async function listUsuarios() {
+  const [rows] = await pool.query('SELECT * FROM usuarios ORDER BY nombre');
+  return rows.map(toUsuario);
+}
+
+async function findUserById(id) {
+  const [rows] = await pool.query('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [id]);
+  return rows[0];
+}
+
+const SELECT_DISPOSITIVO =
+  `SELECT d.id, d.nombre, d.usuario_id, d.especie_id, u.nombre AS dueno_nombre, u.email AS dueno_email
+     FROM dispositivos d LEFT JOIN usuarios u ON u.id = d.usuario_id`;
+
+// Dispositivos de un dueño, o todos si no se pasa ownerId
+async function listDevices(ownerId) {
+  const [rows] = ownerId === undefined
+    ? await pool.query(`${SELECT_DISPOSITIVO} ORDER BY d.nombre`)
+    : await pool.query(`${SELECT_DISPOSITIVO} WHERE d.usuario_id = ? ORDER BY d.nombre`, [ownerId]);
+  return rows;
+}
+
+async function getDevice(id) {
+  const [rows] = await pool.query(`${SELECT_DISPOSITIVO} WHERE d.id = ? LIMIT 1`, [id]);
+  return rows[0];
 }
 
 async function countUsers() {
@@ -153,5 +200,6 @@ async function getLatestState() {
 
 module.exports = {
   pool, init, toApiUser, findUserByLogin, listUsers, countUsers,
+  toUsuario, listUsuarios, findUserById, listDevices, getDevice,
   saveReading, saveFeeding, getHistory, getFeedings, getLatestState,
 };

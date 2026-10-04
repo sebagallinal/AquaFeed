@@ -1,0 +1,49 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Administración</p>
+    <h1>Consola</h1>
+    <p>
+      Usuarios, dispositivos y estado de los servicios, en vivo desde el servidor.
+    </p>
+  </header>
+
+  @if (resumen(); as datos) {
+    <div class="af-stats">
+      <a class="af-stat" routerLink="/admin/usuarios">
+        <span>Usuarios</span>
+        <strong>{{ datos.usuarios }}</strong>
+      </a>
+      <a class="af-stat" routerLink="/admin/dispositivos">
+        <span>Dispositivos</span>
+        <strong>{{ datos.dispositivos }}</strong>
+        <small>{{ datos.enLinea }} en línea · {{ datos.sinVincular }} sin vincular</small>
+      </a>
+      <a class="af-stat" routerLink="/admin/alertas">
+        <span>Alertas abiertas</span>
+        <strong>{{ datos.alertasAbiertas }}</strong>
+      </a>
+      <a class="af-stat" routerLink="/admin/especies">
+        <span>Especies</span>
+        <strong>4</strong>
+        <small>Rangos pendientes</small>
+      </a>
+    </div>
+
+    <h2>Salud del sistema</h2>
+    <ul class="af-health">
+      @for (servicio of datos.servicios; track servicio.nombre) {
+        <li>
+          <div>
+            <strong>{{ servicio.nombre }}</strong>
+            <p>{{ servicio.detalle }}</p>
+          </div>
+          @if (servicio.estado === 'ok') {
+            <span class="af-badge af-badge--on">Conectado</span>
+          } @else {
+            <span class="af-badge af-badge--neutral">Sin conectar</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</section>

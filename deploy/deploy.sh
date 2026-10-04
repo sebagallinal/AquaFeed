@@ -7,12 +7,16 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR"
 git pull --ff-only
 
-cd aquafeed-app
+# Frontend (Angular 22, pide Node 22.22.3 o superior)
+cd frontend
 npm ci --no-audit --no-fund
 npx ng build --configuration production
 
 rm -rf /var/www/aquafeed/*
-cp -r dist/aquafeed-app/browser/. /var/www/aquafeed/
+cp -r dist/aquafeed/browser/. /var/www/aquafeed/
 
+# Backend: sigue en aquafeed-app/server, junto al frontend anterior (que ya no se publica)
+cd ../aquafeed-app
+npm ci --no-audit --no-fund
 pm2 startOrReload ecosystem.config.js --update-env
 pm2 save

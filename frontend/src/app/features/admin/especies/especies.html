@@ -1,0 +1,14 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Catálogo</p>
+    <h1>Perfiles de especie</h1>
+    <p>El alta y la edición llegan con el backend. Las fichas citadas ya están cargadas.</p>
+  </header>
+
+  <app-lista-especies
+    [especies]="especies()"
+    rutaDe="/admin/especies"
+    clave="id"
+    cta="Ver el perfil"
+  />
+</section>

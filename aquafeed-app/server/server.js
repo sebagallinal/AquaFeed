@@ -327,36 +327,46 @@ app.get('/api/devices/all', authenticateToken, (req, res) => {
   res.json({ devices: deviceState });
 });
 
-// Enviar comando "alimentar" al device (publica en aquafeed/{id}/alimentar)
-app.post('/api/devices/:id/alimentar', authenticateToken, (req, res) => {
-  const { id } = req.params;
-
-  // Firmware v1 (id af-...): comando JSON con cmdId y porciones, que el ESP32 confirma con un ack.
-  // Firmware anterior: escucha aquafeed/{id}/alimentar con el payload "alimentar".
+// Publica el comando de alimentación y lo registra en la base.
+// Firmware v1 (id af-...): comando JSON con cmdId y porciones, que el ESP32 confirma con un ack.
+// Firmware anterior: escucha aquafeed/{id}/alimentar con el payload "alimentar".
+async function enviarAlimentar(id, portions, usuarioId) {
   const esV1 = id.startsWith('af-');
-  const portions = Math.min(Math.max(Number(req.body?.portions) || 1, 1), 10);
+  const cmdId = crypto.randomUUID();
   const topic = esV1 ? `aquafeed/v1/${id}/cmd` : `aquafeed/${id}/alimentar`;
-  const msg   = esV1
-    ? JSON.stringify({ cmdId: crypto.randomUUID(), type: 'feed', portions })
-    : 'alimentar';
+  const msg   = esV1 ? JSON.stringify({ cmdId, type: 'feed', portions }) : 'alimentar';
+
+  await mqttClient.publishAsync(topic, msg, { qos: esV1 ? 1 : 0, retain: false });
+  try {
+    await db.saveFeeding(id, 'web', usuarioId);
+  } catch (e) {
+    console.error('❌ Error registrando alimentación:', e.message);
+  }
+  return { cmdId, topic, msg };
+}
+
+// Enviar comando "alimentar" al device
+app.post('/api/devices/:id/alimentar', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const portions = Math.min(Math.max(Number(req.body?.portions) || 1, 1), 10);
 
   if (!mqttClient.connected) {
     return res.status(503).json({ ok: false, error: 'MQTT no conectado' });
   }
 
-  mqttClient.publish(topic, msg, { qos: esV1 ? 1 : 0, retain: false }, async (err) => {
-    if (err) {
-      console.error('❌ Error publicando alimentar:', err);
-      return res.status(500).json({ ok: false, error: 'MQTT publish error' });
-    }
-    try {
-      await db.saveFeeding(id, 'web', req.user.id);
-    } catch (e) {
-      console.error('❌ Error registrando alimentación:', e.message);
-    }
+  try {
+    const { topic, msg } = await enviarAlimentar(id, portions, req.user.id);
     res.json({ ok: true, topic, msg });
-  });
+  } catch (err) {
+    console.error('❌ Error publicando alimentar:', err);
+    res.status(500).json({ ok: false, error: 'MQTT publish error' });
+  }
 });
+
+// API del frontend nuevo (frontend/)
+app.use('/api/v1', require('./api-v1')({
+  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, jwtSecret: JWT_SECRET,
+}));
 
 // Un usuario común solo puede consultar el historial de su dispositivo
 const canAccessDevice = (user, id) => user.role === 'admin' || String(user.deviceId) === String(id);

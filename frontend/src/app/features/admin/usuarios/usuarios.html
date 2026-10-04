@@ -1,0 +1,35 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Cuentas</p>
+    <h1>Usuarios</h1>
+    <p>
+      Habilitar, cambiar el rol o resetear la contraseña llega con el
+      backend.
+    </p>
+  </header>
+
+  <div class="af-table-wrap">
+    <table class="af-table">
+      <thead>
+        <tr>
+          <th scope="col">Nombre</th>
+          <th scope="col">Correo</th>
+          <th scope="col">Rol</th>
+          <th scope="col">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (usuario of usuarios(); track usuario.id) {
+          <tr>
+            <td>
+              <a [routerLink]="['/admin/usuarios', usuario.id]">{{ usuario.nombre }}</a>
+            </td>
+            <td>{{ usuario.email }}</td>
+            <td>{{ etiquetaRol(usuario.rol) }}</td>
+            <td>{{ usuario.activo ? 'Activo' : 'Deshabilitado' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -1,0 +1,254 @@
+@let ficha = especie();
+
+<div class="af-profile">
+  <p class="af-badges">
+    @for (tipo of ficha.tiposAgua; track tipo) {
+      <span class="af-badge af-badge--neutral">{{ etiquetaTipoAgua(tipo) }}</span>
+    }
+    @if (avisoDeEspecie(ficha); as aviso) {
+      <span class="af-badge af-badge--off">{{ aviso }}</span>
+    }
+  </p>
+  @if (ficha.notaTipoAgua) {
+    <p class="af-hint">{{ ficha.notaTipoAgua }}</p>
+  }
+
+  <p class="af-reco">
+    <span class="af-kicker">Temperatura recomendada</span>
+    <strong>{{ ficha.tempRecomendadaC }} °C</strong>
+    @if (ficha.tempRecomendadaEstimada) {
+      <span class="af-badge af-badge--est">Estimado</span>
+    }
+  </p>
+
+  <figure class="af-hero-photo">
+    <img [src]="ficha.foto.src" [alt]="ficha.foto.alt" width="960" height="600" />
+    <figcaption>
+      Foto:
+      <a [href]="ficha.foto.pagina">{{ ficha.foto.autor }}</a>
+      ·
+      <a [href]="ficha.foto.licenciaUrl">{{ ficha.foto.licencia }}</a>
+    </figcaption>
+  </figure>
+
+  @if (ficha.notaAcuario) {
+    <aside class="af-note">
+      <p>{{ ficha.notaAcuario }}</p>
+    </aside>
+  }
+
+  <section>
+    <h2>Ambiente recomendado</h2>
+    <dl class="af-facts">
+      <div>
+        <dt>Tipo</dt>
+        <dd>
+          @if (ficha.ambiente.tipos.length === 0) {
+            {{ datoPendiente }}
+          } @else {
+            <span class="af-badges">
+              @for (tipo of ficha.ambiente.tipos; track tipo) {
+                <span class="af-badge af-badge--neutral">{{ etiquetaAmbiente(tipo) }}</span>
+              }
+            </span>
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Volumen mínimo</dt>
+        <dd>
+          @if (ficha.ambiente.volumenEstimado) {
+            <span class="af-badge af-badge--est">Estimado</span>
+          }
+          {{ textoVolumen(ficha.ambiente) }}
+        </dd>
+      </div>
+      <div>
+        <dt>Nota</dt>
+        <dd>{{ ficha.ambiente.nota ?? datoPendiente }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  @if (ficha.temperatura; as temp) {
+    <section>
+      <h2>Temperatura</h2>
+      <dl class="af-facts af-facts--text">
+        <div>
+          <dt>Ideal</dt>
+          <dd>
+            @if (ideal(temp.ideal, '°C'); as rango) {
+              <span class="af-range">{{ rango }}</span>
+            }
+            <span class="af-detail">{{ temp.ideal.detalle }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Advertencia</dt>
+          <dd>
+            @if (umbral(temp.advertencia, '°C'); as rango) {
+              <span class="af-range">{{ rango }}</span>
+            }
+            <span class="af-detail">{{ temp.advertencia.detalle }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Crítica</dt>
+          <dd>
+            @if (umbral(temp.critico, '°C'); as rango) {
+              <span class="af-range">{{ rango }}</span>
+            }
+            <span class="af-detail">{{ temp.critico.detalle }}</span>
+          </dd>
+        </div>
+      </dl>
+    </section>
+  } @else {
+    <section>
+      <h2>Temperatura</h2>
+      <dl class="af-facts">
+        <div>
+          <dt>Mínima</dt>
+          <dd>{{ rango(ficha.tempMinC, '°C') }}</dd>
+        </div>
+        <div>
+          <dt>Máxima</dt>
+          <dd>{{ rango(ficha.tempMaxC, '°C') }}</dd>
+        </div>
+      </dl>
+    </section>
+  }
+
+  @if (ficha.ph; as ph) {
+    <section>
+      <h2>pH</h2>
+      <dl class="af-facts af-facts--text">
+        <div>
+          <dt>Ideal</dt>
+          <dd>
+            @if (ideal(ph.ideal); as rango) {
+              <span class="af-range">{{ rango }}</span>
+            }
+            <span class="af-detail">{{ ph.ideal.detalle }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Advertencia</dt>
+          <dd>
+            @if (umbral(ph.advertencia, ''); as rango) {
+              <span class="af-range">{{ rango }}</span>
+            }
+            <span class="af-detail">{{ ph.advertencia.detalle }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Crítica</dt>
+          <dd>
+            @if (umbral(ph.critico, ''); as rango) {
+              <span class="af-range">{{ rango }}</span>
+            }
+            <span class="af-detail">{{ ph.critico.detalle }}</span>
+          </dd>
+        </div>
+      </dl>
+    </section>
+  } @else {
+    <section>
+      <h2>pH</h2>
+      <p class="af-hint">Dato pendiente</p>
+    </section>
+  }
+
+  <section>
+    <h2>TDS y dureza</h2>
+    <p>{{ ficha.notaTds ?? 'TDS: ' + datoPendiente }}</p>
+    @if (ficha.notaDureza) {
+      <p class="af-hint">{{ ficha.notaDureza }}</p>
+    }
+  </section>
+
+  @if (ficha.avisoAlimentacion; as comida) {
+    <aside class="af-note">
+      <p>{{ comida.detalle }}</p>
+    </aside>
+  }
+
+  @if (ficha.dosis; as dosis) {
+    <section>
+      <h2>
+        Dosis en pellets
+        @if (dosis.estimacion) {
+          <span class="af-badge af-badge--est">Estimado</span>
+        }
+      </h2>
+      <p class="af-hint">
+        El alimentador dosifica por cantidad de pellets. Los números son para un pez de la talla de
+        referencia.
+      </p>
+      <dl class="af-facts">
+        <div>
+          <dt>Por toma</dt>
+          <dd>{{ textoPelletsPorToma(dosis) }}</dd>
+        </div>
+        <div>
+          <dt>Por día</dt>
+          <dd>{{ textoPelletsPorDia(dosis) }}</dd>
+        </div>
+        <div>
+          <dt>Tomas por día</dt>
+          <dd>{{ dosis.tomasPorDia ?? 'Sin dato en la ficha' }}</dd>
+        </div>
+        <div>
+          <dt>Tamaño de pellet</dt>
+          <dd>{{ textoPelletMm(dosis) }}</dd>
+        </div>
+        <div>
+          <dt>Talla de referencia</dt>
+          <dd>{{ dosis.tallaReferencia }}</dd>
+        </div>
+      </dl>
+      @if (dosis.aclaracion) {
+        <p class="af-callout">{{ dosis.aclaracion }}</p>
+      }
+      <p class="af-hint">{{ dosis.detalle }}</p>
+    </section>
+  } @else {
+    <section>
+      <h2>Porciones</h2>
+      <dl class="af-facts">
+        <div>
+          <dt>Porciones sugeridas</dt>
+          <dd>
+            {{
+              ficha.porcionesSugeridas === null
+                ? 'Pendiente de bibliografía'
+                : ficha.porcionesSugeridas
+            }}
+          </dd>
+        </div>
+        <div>
+          <dt>Frecuencia sugerida</dt>
+          <dd>{{ ficha.frecuenciaSugerida ?? 'Pendiente de bibliografía' }}</dd>
+        </div>
+      </dl>
+    </section>
+  }
+
+  @if (ficha.suspensionAlimentacion; as suspension) {
+    <section>
+      <h2>
+        Cuándo suspender la alimentación
+        @if (suspension.estimacion || suspension.bajoEsCriterioDeDiseno) {
+          <span class="af-badge af-badge--est">Estimado</span>
+        }
+      </h2>
+      <p class="af-range">{{ textoSuspension(suspension) }}</p>
+      <p class="af-hint">{{ suspension.detalle }}</p>
+    </section>
+  }
+
+  <section>
+    <h2>Fuente</h2>
+    <p>{{ ficha.fuente ?? 'Todavía sin citar' }}</p>
+  </section>
+</div>

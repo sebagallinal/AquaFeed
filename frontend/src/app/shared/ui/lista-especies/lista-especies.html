@@ -1,0 +1,136 @@
+<div class="af-toolbar">
+  <div class="af-search">
+    <label class="af-search__label" for="buscar-especie">Buscar especie</label>
+    <div class="af-search__field">
+      <span class="mat-icon" aria-hidden="true">search</span>
+      <input
+        id="buscar-especie"
+        type="search"
+        name="buscar-especie"
+        placeholder="Nombre común o científico"
+        autocomplete="off"
+        [value]="consulta()"
+        (input)="alBuscar($event)"
+      />
+    </div>
+  </div>
+
+  <div class="af-filter-row">
+    <fieldset class="af-filter" (change)="alFiltrar($event)">
+      <legend>Tipo de agua</legend>
+      <label>
+        <input type="radio" name="tipo-agua" value="todas" [checked]="filtro() === 'todas'" />
+        Todas
+      </label>
+      <label>
+        <input type="radio" name="tipo-agua" value="fria" [checked]="filtro() === 'fria'" />
+        Agua fría
+      </label>
+      <label>
+        <input type="radio" name="tipo-agua" value="tropical" [checked]="filtro() === 'tropical'" />
+        Tropical
+      </label>
+    </fieldset>
+
+    <fieldset class="af-filter" (change)="alFiltrar($event)">
+      <legend>Ambiente</legend>
+      <label>
+        <input
+          type="radio"
+          name="ambiente"
+          value="todos"
+          [checked]="filtroAmbiente() === 'todos'"
+        />
+        Todos
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="ambiente"
+          value="acuario"
+          [checked]="filtroAmbiente() === 'acuario'"
+        />
+        Acuario
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="ambiente"
+          value="estanque"
+          [checked]="filtroAmbiente() === 'estanque'"
+        />
+        Estanque
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="ambiente"
+          value="no-apto"
+          [checked]="filtroAmbiente() === 'no-apto'"
+        />
+        No apto para uso doméstico
+      </label>
+    </fieldset>
+  </div>
+
+  <div class="af-results">
+    <p aria-live="polite">{{ textoResultados() }}</p>
+    <button
+      type="button"
+      class="af-btn af-btn--ghost"
+      (click)="limpiar()"
+      [disabled]="!hayFiltro()"
+    >
+      Limpiar filtros
+    </button>
+  </div>
+</div>
+
+@if (visibles().length === 0) {
+  <div class="af-empty">
+    <h2>Ninguna especie coincide</h2>
+    <p>Probá con otro nombre o con otro filtro.</p>
+  </div>
+} @else {
+  <div class="af-grid">
+    @for (especie of visibles(); track especie.id) {
+      <article class="af-species-card">
+        <a class="af-species" [routerLink]="enlace(especie)">
+          <span class="af-species__media">
+            <img
+              class="af-species__photo"
+              [src]="especie.foto.src"
+              [alt]="especie.foto.alt"
+              width="960"
+              height="600"
+              loading="lazy"
+              decoding="async"
+            />
+            @if (avisoDeEspecie(especie); as aviso) {
+              <span class="af-badge af-badge--off af-species__flag">{{ aviso }}</span>
+            }
+          </span>
+          <div class="af-species__body">
+            <p class="af-kicker">{{ especie.nombreCientifico }}</p>
+            <h2>{{ especie.nombre }}</h2>
+            <p class="af-badges">
+              @for (tipo of especie.tiposAgua; track tipo) {
+                <span class="af-badge af-badge--neutral">{{ etiquetaTipoAgua(tipo) }}</span>
+              }
+            </p>
+            @if (especie.avisoAlimentacion; as comida) {
+              <p>
+                <span class="af-badge af-badge--feed">{{ comida.resumen }}</span>
+              </p>
+            }
+            <p>{{ cta() }}</p>
+          </div>
+        </a>
+        <p class="af-photo-credit">
+          Foto: {{ especie.foto.autor }}.
+          <a [href]="especie.foto.licenciaUrl">{{ especie.foto.licencia }}</a>
+        </p>
+      </article>
+    }
+  </div>
+}

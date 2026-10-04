@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AquaFeed">
+  <rect width="64" height="64" rx="16" fill="#08343A"/>
+  <path fill="#E7F6F4" d="M12 33.5c8.2-9.2 18.4-13.2 31.2-11.2-.4 4.6-3.2 8-7.6 9.8 4.6 1.6 7.4 5.2 7.6 9.8-13 .8-23.2-3.4-31.2-12.2 4.2-.8 6.6-2.2 6.6-4.1s-2.4-3.1-6.6-3.9z"/>
+  <circle cx="36.5" cy="28.2" r="1.7" fill="#08343A"/>
+  <circle cx="50" cy="16" r="2.4" fill="#F2C14E"/>
+  <circle cx="56" cy="22.5" r="1.3" fill="#F2C14E" opacity=".85"/>
+</svg>

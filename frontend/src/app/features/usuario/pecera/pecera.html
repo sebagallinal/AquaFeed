@@ -1,0 +1,81 @@
+<section class="af-page">
+  <a class="af-back" routerLink="/app">Volver a mis peceras</a>
+
+  @if (detalle() === undefined) {
+    <p>Cargando pecera…</p>
+  } @else if (detalle(); as pecera) {
+    <header class="af-page-head af-page-head--row">
+      <div>
+        <p class="af-kicker">{{ pecera.especie?.nombre ?? 'Sin especie' }}</p>
+        <h1>{{ pecera.dispositivo.nombre }}</h1>
+        <p>
+          {{ pecera.dispositivo.online ? 'En línea' : 'Sin conexión' }}
+          · config v{{ pecera.dispositivo.configVersion }}
+          @if (pecera.dispositivo.fw) {
+            · firmware {{ pecera.dispositivo.fw }}
+          }
+        </p>
+      </div>
+      <span
+        class="af-badge"
+        [class.af-badge--on]="pecera.dispositivo.online"
+        [class.af-badge--off]="!pecera.dispositivo.online"
+      >
+        {{ pecera.dispositivo.online ? 'En línea' : 'Sin conexión' }}
+      </span>
+    </header>
+
+    <dl class="af-metrics af-metrics--plain">
+      <div>
+        <dt>pH</dt>
+        <dd>{{ textoPh(pecera.lectura?.ph ?? null) }}</dd>
+      </div>
+      <div>
+        <dt>Temperatura</dt>
+        <dd>{{ textoTemp(pecera.lectura?.waterTempC ?? null) }}</dd>
+      </div>
+      <div>
+        <dt>TDS</dt>
+        <dd>{{ textoTds(pecera.lectura?.tdsPpm ?? null) }}</dd>
+      </div>
+    </dl>
+    <p class="af-tank__when">
+      {{ pecera.dispositivo.online ? 'Actualizado' : 'Última lectura' }}
+      {{ haceCuanto(pecera.lectura?.ts ?? null) }}
+    </p>
+
+    <div class="af-actions">
+      <button type="button" class="af-btn af-btn--feed" (click)="pedir(pecera)">
+        <mat-icon aria-hidden="true">restaurant</mat-icon>
+        Alimentar ahora
+      </button>
+      <a
+        class="af-btn af-btn--ghost"
+        [routerLink]="['/app/dispositivos', pecera.dispositivo.id, 'horarios']"
+      >
+        Ver horarios
+      </a>
+      @if (pecera.especie) {
+        <a class="af-btn af-btn--ghost" [routerLink]="['/app/especies', pecera.especie.slug]">
+          Guía de {{ pecera.especie.nombre }}
+        </a>
+      }
+    </div>
+
+    <aside class="af-note">
+      <p>
+        <strong>Próxima alimentación:</strong>
+        {{ pecera.proxima?.etiqueta ?? 'Sin horarios activos' }}
+      </p>
+      <p>
+        El historial y los gráficos de lecturas llegan en la próxima etapa, cuando haya base de
+        datos.
+      </p>
+    </aside>
+  } @else {
+    <div class="af-empty">
+      <h1>No encontramos esa pecera</h1>
+      <p>Puede que no exista o que no sea tuya.</p>
+    </div>
+  }
+</section>

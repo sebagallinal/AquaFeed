@@ -1,0 +1,23 @@
+<section class="af-page">
+  <a class="af-back" routerLink="/app/especies">Volver a especies</a>
+
+  @if (especie() === undefined) {
+    <p>Cargando ficha…</p>
+  } @else if (especie(); as ficha) {
+    <header class="af-page-head">
+      <p class="af-kicker">{{ ficha.nombreCientifico }}</p>
+      <h1>{{ ficha.nombre }}</h1>
+      @if (ficha.nombresComunes; as otros) {
+        <p class="af-hint">También: {{ otros.join(', ') }}</p>
+      }
+      <p>{{ ficha.guia }}</p>
+    </header>
+
+    <app-ficha-especie [especie]="ficha" />
+  } @else {
+    <div class="af-empty">
+      <h1>No encontramos esa especie</h1>
+      <p>Esa especie no está en el catálogo.</p>
+    </div>
+  }
+</section>

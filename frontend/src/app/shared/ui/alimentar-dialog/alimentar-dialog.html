@@ -1,0 +1,43 @@
+<h2 mat-dialog-title>Alimentar ahora</h2>
+<mat-dialog-content>
+  <p>
+    ¿Confirmás una toma en <strong>{{ data.nombre }}</strong
+    >?
+  </p>
+  @if (data.online) {
+    <fieldset class="af-porciones">
+      <legend>Porciones</legend>
+      @for (n of opciones; track n) {
+        <label class="af-porcion">
+          <input
+            type="radio"
+            name="porciones"
+            [value]="n"
+            [checked]="porciones() === n"
+            (change)="porciones.set(n)"
+          />
+          <span>{{ textoPorciones(n) }}</span>
+        </label>
+      }
+    </fieldset>
+    <p class="af-hint">
+      El alimentador recibe el comando en el momento.
+    </p>
+  } @else {
+    <p class="af-hint">
+      La pecera está sin conexión. El alimentador no va a recibir el comando hasta que vuelva.
+    </p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button type="button" mat-button mat-dialog-close>Cancelar</button>
+  <button
+    type="button"
+    mat-flat-button
+    class="af-feed"
+    [mat-dialog-close]="porciones()"
+    [disabled]="!data.online"
+  >
+    Alimentar
+  </button>
+</mat-dialog-actions>
