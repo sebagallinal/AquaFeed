@@ -11,7 +11,10 @@
 // Broker y certificados de este dispositivo. No se versiona: copiar config.example.h
 #include "config.h"
 
-#define FW_VERSION "1.0.0"
+// Calendario de alimentación (aquafeed/v1/{id}/config)
+#include "horarios.h"
+
+#define FW_VERSION "1.1.0"
 
 
 // =====================================================
@@ -121,6 +124,10 @@ char topicStatus[48];
 char topicEvent[48];
 char topicAck[48];
 char topicCmd[48];
+char topicConfig[48];
+
+// Se publica el status desde el loop cuando cambia el calendario
+bool statusPendiente = false;
 
 // El comando se anota en el callback y se ejecuta en el loop, para no mover
 // el motor ni publicar desde adentro del callback de PubSubClient
@@ -147,6 +154,7 @@ void armarIdentidad() {
   snprintf(topicEvent,     sizeof(topicEvent),     "aquafeed/v1/%s/event",     deviceId);
   snprintf(topicAck,       sizeof(topicAck),       "aquafeed/v1/%s/ack",       deviceId);
   snprintf(topicCmd,       sizeof(topicCmd),       "aquafeed/v1/%s/cmd",       deviceId);
+  snprintf(topicConfig,    sizeof(topicConfig),    "aquafeed/v1/%s/config",    deviceId);
 }
 
 
@@ -171,20 +179,21 @@ void publicarStatus() {
   doc["online"] = true;
   doc["fw"] = FW_VERSION;
   doc["rssi"] = WiFi.RSSI();
+  doc["configVersion"] = calendario.version;   // el backend sabe si ya aplicó el último calendario
 
   publicar(topicStatus, doc, true);
 }
 
 
-// origen: "button" o "cmd"
-void publicarAlimentacion(const char* origen, int porciones, const char* cmdId) {
+// origen: "button", "cmd" o "schedule". ts: cuándo ocurrió (0 = ahora)
+void publicarAlimentacion(const char* origen, int porciones, const char* cmdId, long ts = 0) {
 
   JsonDocument doc;
 
   doc["type"] = "feed";
   doc["source"] = origen;
   doc["portions"] = porciones;
-  doc["ts"] = (long)time(nullptr);
+  doc["ts"] = ts ? ts : (long)time(nullptr);
 
   if (cmdId[0])
     doc["cmdId"] = cmdId;
@@ -194,6 +203,14 @@ void publicarAlimentacion(const char* origen, int porciones, const char* cmdId) 
 
 
 void alRecibirMensaje(char* topic, byte* payload, unsigned int length) {
+
+  if (strcmp(topic, topicConfig) == 0) {
+
+    if (calendarioRecibir(payload, length))
+      statusPendiente = true;
+
+    return;
+  }
 
   JsonDocument doc;
 
@@ -236,10 +253,17 @@ void conectarMqtt() {
     Serial.println("OK");
 
     mqtt.subscribe(topicCmd, 1);
+    mqtt.subscribe(topicConfig, 1);   // retenido: llega enseguida el último calendario
 
     publicarStatus();
 
     ultimoStatus = millis();
+
+    // Tomas programadas que se hicieron sin conexión
+    for (int i = 0; i < cantidadSinInformar; i++)
+      publicarAlimentacion("schedule", tomasSinInformar[i].porciones, "", tomasSinInformar[i].ts);
+
+    cantidadSinInformar = 0;
   }
 
   else {
@@ -253,7 +277,8 @@ void conectarMqtt() {
 // La hora hace falta para validar el certificado del broker y para el ts de los mensajes
 void sincronizarHora() {
 
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  // Con la zona del calendario: los horarios se comparan en hora local
+  configTzTime(calendario.tz, "pool.ntp.org", "time.nist.gov");
 
   Serial.print("[HORA] Sincronizando");
 
@@ -467,6 +492,25 @@ void revisarPulsador() {
 }
 
 
+// Toma del calendario. Funciona sin red: si no hay broker se informa al reconectar.
+void revisarCalendario() {
+
+  int porciones = calendarioTomaPendiente();
+
+  if (!porciones)
+    return;
+
+  Serial.println("[CALENDARIO] Toma programada");
+
+  dosificar(porciones);
+
+  if (mqtt.connected())
+    publicarAlimentacion("schedule", porciones, "");
+  else
+    calendarioGuardarSinInformar((long)time(nullptr), porciones);
+}
+
+
 void atenderComando() {
 
   if (!comando.pendiente)
@@ -594,6 +638,8 @@ void setup() {
   Serial.print("[WIFI] Conectado, IP ");
   Serial.println(WiFi.localIP());
 
+  calendarioCargar();
+
   sincronizarHora();
 
 
@@ -607,7 +653,7 @@ void setup() {
 
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setCallback(alRecibirMensaje);
-  mqtt.setBufferSize(512);
+  mqtt.setBufferSize(1024);   // el calendario con 8 horarios ronda los 450 bytes
 
 
   Serial.println();
@@ -633,6 +679,15 @@ void loop() {
   revisarPulsador();
 
   atenderComando();
+
+  revisarCalendario();
+
+  if (statusPendiente && mqtt.connected()) {
+
+    statusPendiente = false;
+
+    publicarStatus();
+  }
 
 
   // PH cada 500 ms (alimenta el filtro)

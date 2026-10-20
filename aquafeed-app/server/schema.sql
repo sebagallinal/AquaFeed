@@ -59,3 +59,23 @@ CREATE TABLE IF NOT EXISTS alimentaciones (
   CONSTRAINT fk_alim_dispositivo FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id),
   CONSTRAINT fk_alim_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Calendario de alimentación. El backend versiona la lista completa y la publica retenida en
+-- aquafeed/v1/{id}/config; el ESP32 la guarda en memoria y la ejecuta solo, aunque no tenga red.
+-- dias: días ISO separados por coma (1 = lunes … 7 = domingo). hora: HH:MM en hora de la pecera.
+CREATE TABLE IF NOT EXISTS horarios (
+  id              INT          NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  dispositivo_id  VARCHAR(32)  NOT NULL,
+  dias            VARCHAR(20)  NOT NULL,
+  hora            CHAR(5)      NOT NULL,
+  porciones       TINYINT      NOT NULL,
+  activo          TINYINT(1)   NOT NULL DEFAULT 1,
+  INDEX idx_horarios_disp (dispositivo_id),
+  CONSTRAINT fk_horarios_dispositivo FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE dispositivos ADD COLUMN IF NOT EXISTS config_version INT NOT NULL DEFAULT 0 AFTER especie_id;
+
+-- programada: la ejecutó el ESP32 según el calendario. porciones: NULL en registros anteriores.
+ALTER TABLE alimentaciones MODIFY COLUMN origen ENUM('web','boton','programada') NOT NULL;
+ALTER TABLE alimentaciones ADD COLUMN IF NOT EXISTS porciones TINYINT NULL AFTER origen;

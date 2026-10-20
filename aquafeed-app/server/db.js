@@ -93,7 +93,8 @@ async function findUserById(id) {
 }
 
 const SELECT_DISPOSITIVO =
-  `SELECT d.id, d.nombre, d.usuario_id, d.especie_id, u.nombre AS dueno_nombre, u.email AS dueno_email
+  `SELECT d.id, d.nombre, d.usuario_id, d.especie_id, d.config_version,
+          u.nombre AS dueno_nombre, u.email AS dueno_email
      FROM dispositivos d LEFT JOIN usuarios u ON u.id = d.usuario_id`;
 
 // Dispositivos de un dueño, o todos si no se pasa ownerId
@@ -140,12 +141,60 @@ async function saveReading(deviceId, tipo, data, fecha) {
   }
 }
 
-async function saveFeeding(deviceId, origen, usuarioId = null, fecha = new Date()) {
+async function saveFeeding(deviceId, origen, usuarioId = null, fecha = new Date(), porciones = null) {
   await ensureDevice(deviceId);
   await pool.query(
-    'INSERT INTO alimentaciones (dispositivo_id, origen, usuario_id, registrado_en) VALUES (?, ?, ?, ?)',
-    [deviceId, origen, usuarioId, fecha]
+    'INSERT INTO alimentaciones (dispositivo_id, origen, porciones, usuario_id, registrado_en) VALUES (?, ?, ?, ?, ?)',
+    [deviceId, origen, porciones, usuarioId, fecha]
   );
+}
+
+// Horario en el formato del frontend (frontend/src/app/shared/models/horario.model.ts)
+const toHorario = (row) => ({
+  id: String(row.id),
+  deviceId: row.dispositivo_id,
+  days: row.dias.split(',').map(Number),
+  time: row.hora,
+  portions: row.porciones,
+  enabled: !!row.activo,
+});
+
+// Horarios de varios dispositivos de una vez: { [deviceId]: Horario[] }
+async function listSchedules(deviceIds) {
+  const porDispositivo = Object.fromEntries(deviceIds.map((id) => [id, []]));
+  if (deviceIds.length === 0) return porDispositivo;
+  const [rows] = await pool.query(
+    'SELECT * FROM horarios WHERE dispositivo_id IN (?) ORDER BY hora, id',
+    [deviceIds]
+  );
+  for (const row of rows) porDispositivo[row.dispositivo_id].push(toHorario(row));
+  return porDispositivo;
+}
+
+// Reemplaza el calendario completo y sube la versión. Devuelve { horarios, version }.
+async function replaceSchedules(deviceId, horarios) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM horarios WHERE dispositivo_id = ?', [deviceId]);
+    for (const h of horarios) {
+      await conn.query(
+        'INSERT INTO horarios (dispositivo_id, dias, hora, porciones, activo) VALUES (?, ?, ?, ?, ?)',
+        [deviceId, h.days.join(','), h.time, h.portions, h.enabled ? 1 : 0]
+      );
+    }
+    await conn.query('UPDATE dispositivos SET config_version = config_version + 1 WHERE id = ?', [deviceId]);
+    const [[{ config_version: version }]] = await conn.query(
+      'SELECT config_version FROM dispositivos WHERE id = ?', [deviceId]
+    );
+    await conn.commit();
+    return { horarios: (await listSchedules([deviceId]))[deviceId], version };
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
 }
 
 // Historial de lecturas entre dos fechas, en el mismo formato que publica el ESP32
@@ -163,7 +212,7 @@ async function getHistory(deviceId, tipo, desde, hasta, limit) {
 
 async function getFeedings(deviceId, limit) {
   const [rows] = await pool.query(
-    `SELECT a.id, a.origen, a.registrado_en AS ts, u.username
+    `SELECT a.id, a.origen, a.porciones, a.registrado_en AS ts, u.username
        FROM alimentaciones a LEFT JOIN usuarios u ON u.id = a.usuario_id
       WHERE a.dispositivo_id = ? ORDER BY a.registrado_en DESC LIMIT ?`,
     [deviceId, limit]
@@ -202,4 +251,5 @@ module.exports = {
   pool, init, toApiUser, findUserByLogin, listUsers, countUsers,
   toUsuario, listUsuarios, findUserById, listDevices, getDevice,
   saveReading, saveFeeding, getHistory, getFeedings, getLatestState,
+  listSchedules, replaceSchedules,
 };

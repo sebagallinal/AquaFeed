@@ -1228,3 +1228,233 @@ h2 .af-badge {
     scroll-behavior: auto;
   }
 }
+
+/* ---------- Editor de horarios ---------- */
+
+.af-page-head .af-badge {
+  align-self: flex-start;
+  white-space: normal;
+}
+
+.af-page-head .af-badge--on {
+  color: var(--af-online);
+}
+
+.af-page-head .af-badge--off {
+  color: var(--af-offline);
+}
+
+.af-sched-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.af-panel {
+  background: var(--af-card);
+  border: 1px solid var(--af-line);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.af-panel h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.af-panel .af-hint {
+  margin: 0;
+}
+
+.af-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.af-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.af-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--af-muted);
+}
+
+.af-field select,
+.af-field input {
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--af-ink);
+  background: #fff;
+  border: 1px solid var(--af-line);
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 6px 10px;
+}
+
+.af-field select:focus-visible,
+.af-field input:focus-visible,
+.af-day:focus-visible {
+  outline: 2px solid var(--af-deep-2);
+  outline-offset: 1px;
+}
+
+.af-field input:disabled {
+  opacity: 0.5;
+}
+
+.af-field--time input {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.af-days {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.af-days legend {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--af-muted);
+  margin-bottom: 6px;
+}
+
+.af-day {
+  appearance: none;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  min-width: 44px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--af-line);
+  background: #fff;
+  color: #6d8486;
+  cursor: pointer;
+}
+
+.af-day[aria-pressed='true'] {
+  background: #d7f3f0;
+  border-color: #9fd8d1;
+  color: var(--af-deep);
+}
+
+.af-sched-edit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.af-sched-edit li {
+  border: 1px solid var(--af-line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.af-sched-edit__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.af-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  font-weight: 600;
+  color: var(--af-muted);
+  cursor: pointer;
+}
+
+.af-switch input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--af-deep-2);
+}
+
+.af-btn--small {
+  min-height: 36px;
+  padding: 6px 12px;
+  margin-left: auto;
+}
+
+.af-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.af-week div {
+  background: var(--af-foam);
+  border-radius: 10px;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.af-week dt {
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.af-week dd {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: var(--af-muted);
+}
+
+.af-ok {
+  background: var(--af-online-bg);
+  color: var(--af-online);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.af-panel .af-alert {
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .af-sched-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .af-week {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .af-plan-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

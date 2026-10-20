@@ -4,7 +4,7 @@ import type { Observable } from 'rxjs';
 import type { ProximaAlimentacion } from '../fecha';
 import type { Alerta } from '../models/alerta.model';
 import type { Dispositivo } from '../models/dispositivo.model';
-import type { Horario } from '../models/horario.model';
+import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
 import type { Usuario } from '../models/usuario.model';
@@ -46,6 +46,13 @@ export interface ResumenAdmin {
   servicios: ServicioSalud[];
 }
 
+/** Respuesta al guardar el calendario. `enviado`: el broker ya se lo pasó al dispositivo. */
+export interface HorariosGuardados {
+  horarios: Horario[];
+  configVersion: number;
+  enviado: boolean;
+}
+
 export interface ComandoAlimentacion {
   cmdId: string;
   status: 'sent';
@@ -65,6 +72,12 @@ export interface DatosApi {
   especies(): Observable<PerfilEspecie[]>;
   especie(slug: string): Observable<PerfilEspecie | null>;
   alimentar(deviceId: string, usuarioId: string, portions: number): Observable<ComandoAlimentacion>;
+  /** Reemplaza el calendario completo de la pecera. */
+  guardarHorarios(
+    deviceId: string,
+    usuarioId: string,
+    horarios: HorarioEditable[],
+  ): Observable<HorariosGuardados>;
   resumenAdmin(): Observable<ResumenAdmin>;
   usuarios(): Observable<Usuario[]>;
   usuario(id: string): Observable<Usuario | null>;

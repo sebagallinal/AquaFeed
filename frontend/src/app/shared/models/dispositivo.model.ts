@@ -11,7 +11,10 @@ export interface Dispositivo {
   ownerId: string | null;
   speciesProfileId: string | null;
   tz: string;
+  /** Versión del calendario guardado en el backend. */
   configVersion: number;
+  /** Versión que el dispositivo confirmó que aplicó. null si nunca informó. */
+  configAplicada: number | null;
   /** ISO 8601 de la última vez que el backend lo vio, o null si nunca conectó. */
   lastSeen: string | null;
   online: boolean;

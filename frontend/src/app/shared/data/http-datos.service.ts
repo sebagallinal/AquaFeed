@@ -2,7 +2,9 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { catchError, EMPTY, map, Observable, of, switchMap, throwError, timer } from 'rxjs';
 
+import { proximaAlimentacion } from '../fecha';
 import type { Dispositivo } from '../models/dispositivo.model';
+import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
 import type { Usuario } from '../models/usuario.model';
@@ -12,6 +14,7 @@ import {
   type AlertaVista,
   type ComandoAlimentacion,
   type DispositivoAdmin,
+  type HorariosGuardados,
   type PeceraDetalle,
   type PeceraResumen,
   type ResumenAdmin,
@@ -26,11 +29,12 @@ const INTERVALO_VIVO_MS = 5000;
 interface PeceraBackend {
   dispositivo: Dispositivo;
   lectura: Lectura | null;
+  horarios: Horario[];
 }
 
 /**
  * Datos del backend Express (`/api/v1`). El usuario sale del token, así que los `usuarioId`
- * de `DatosApi` no viajan. Lo que el backend todavía no tiene queda vacío: horarios y alertas.
+ * de `DatosApi` no viajan. Lo que el backend todavía no tiene queda vacío: las alertas.
  * Las fichas de especies siguen siendo las que trae el frontend.
  */
 @Injectable()
@@ -46,7 +50,7 @@ export class HttpDatosService implements DatosApi {
   pecera(id: string): Observable<PeceraDetalle | null> {
     return this.enVivo(() =>
       this.http.get<PeceraBackend>(`${API}/peceras/${encodeURIComponent(id)}`).pipe(
-        map((pecera): PeceraDetalle => ({ ...resumen(pecera), horarios: [] })),
+        map((pecera): PeceraDetalle => ({ ...resumen(pecera), horarios: pecera.horarios })),
         catchError(nullSiNoExiste),
       ),
     );
@@ -80,6 +84,25 @@ export class HttpDatosService implements DatosApi {
       .pipe(
         catchError((error: unknown) =>
           throwError(() => new PeceraNoDisponibleError(mensajeDe(error))),
+        ),
+      );
+  }
+
+  guardarHorarios(
+    deviceId: string,
+    _usuarioId: string,
+    horarios: HorarioEditable[],
+  ): Observable<HorariosGuardados> {
+    return this.http
+      .put<HorariosGuardados>(`${API}/peceras/${encodeURIComponent(deviceId)}/horarios`, {
+        horarios,
+      })
+      .pipe(
+        catchError((error: unknown) =>
+          throwError(
+            () =>
+              new PeceraNoDisponibleError(mensajeDe(error, 'No se pudieron guardar los horarios.')),
+          ),
         ),
       );
   }
@@ -124,11 +147,12 @@ export class HttpDatosService implements DatosApi {
   }
 }
 
-function resumen(pecera: PeceraBackend): PeceraResumen {
+function resumen({ dispositivo, lectura, horarios }: PeceraBackend): PeceraResumen {
   return {
-    ...pecera,
-    proxima: null,
-    especie: especieDe(pecera.dispositivo.speciesProfileId),
+    dispositivo,
+    lectura,
+    proxima: proximaAlimentacion(horarios ?? []),
+    especie: especieDe(dispositivo.speciesProfileId),
     alertasAbiertas: 0,
   };
 }
@@ -150,10 +174,10 @@ function nullSiNoExiste(error: unknown): Observable<null> {
     : throwError(() => error);
 }
 
-function mensajeDe(error: unknown): string {
+function mensajeDe(error: unknown, porDefecto = 'No se pudo enviar el comando.'): string {
   const cuerpo: unknown = error instanceof HttpErrorResponse ? error.error : null;
   if (typeof cuerpo === 'object' && cuerpo !== null && 'message' in cuerpo) {
     return String(cuerpo.message);
   }
-  return 'No se pudo enviar el comando.';
+  return porDefecto;
 }

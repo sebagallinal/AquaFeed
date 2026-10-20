@@ -110,9 +110,13 @@ async function onMessageV1(id, tipo, data, ahora) {
     deviceState[id].status = { ...data, ts: ahora.toISOString() };
   } else if (tipo === 'event') {
     // Las alimentaciones pedidas desde la web ya se registran al enviar el comando
-    if (data.type === 'feed' && data.source === 'button') {
-      await db.saveFeeding(id, 'boton', null, ahora);
-      console.log(`🐟 Alimentación por botón: Device ${id}`);
+    const origen = { button: 'boton', schedule: 'programada' }[data.source];
+    if (data.type === 'feed' && origen) {
+      const porciones = Number.isInteger(data.portions) ? data.portions : null;
+      // Una toma hecha sin red llega después, con el ts de cuando ocurrió
+      const fecha = Number.isInteger(data.ts) && data.ts > 1700000000 ? new Date(data.ts * 1000) : ahora;
+      await db.saveFeeding(id, origen, null, fecha, porciones);
+      console.log(`🐟 Alimentación (${origen}, ${porciones ?? '?'} porc.): Device ${id}`);
     }
   } else if (tipo === 'ack') {
     console.log(`📬 Ack de ${id}: cmd ${data.cmdId} ${data.ok ? 'ok' : 'falló'}`);
@@ -338,11 +342,27 @@ async function enviarAlimentar(id, portions, usuarioId) {
 
   await mqttClient.publishAsync(topic, msg, { qos: esV1 ? 1 : 0, retain: false });
   try {
-    await db.saveFeeding(id, 'web', usuarioId);
+    await db.saveFeeding(id, 'web', usuarioId, new Date(), portions);
   } catch (e) {
     console.error('❌ Error registrando alimentación:', e.message);
   }
   return { cmdId, topic, msg };
+}
+
+// Zona horaria POSIX para el ESP32. Argentina no tiene horario de verano: UTC-3 todo el año.
+const TZ_POSIX = '<-03>3';
+
+// Publica el calendario retenido: el ESP32 lo recibe al conectarse aunque se haya
+// guardado mientras estaba apagado. Solo viajan los horarios activos.
+async function publicarConfig(id, version, horarios) {
+  if (!id.startsWith('af-')) return false;   // el firmware anterior no tiene calendario
+  const msg = JSON.stringify({
+    version,
+    tz: TZ_POSIX,
+    schedules: horarios.filter((h) => h.enabled).map(({ days, time, portions }) => ({ days, time, portions })),
+  });
+  await mqttClient.publishAsync(`aquafeed/v1/${id}/config`, msg, { qos: 1, retain: true });
+  return true;
 }
 
 // Enviar comando "alimentar" al device
@@ -365,7 +385,8 @@ app.post('/api/devices/:id/alimentar', authenticateToken, async (req, res) => {
 
 // API del frontend nuevo (frontend/)
 app.use('/api/v1', require('./api-v1')({
-  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, jwtSecret: JWT_SECRET,
+  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, publicarConfig,
+  jwtSecret: JWT_SECRET,
 }));
 
 // Un usuario común solo puede consultar el historial de su dispositivo

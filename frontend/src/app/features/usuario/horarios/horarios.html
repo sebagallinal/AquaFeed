@@ -8,38 +8,213 @@
       <p class="af-kicker">{{ pecera.dispositivo.nombre }}</p>
       <h1>Horarios</h1>
       <p>
-        Hasta 8 tomas por semana, en hora de la pecera. Editarlas y bajar la config al dispositivo
-        va a estar disponible con el backend.
+        El alimentador guarda el calendario y lo cumple solo, en hora de Argentina, aunque se corte
+        internet. Hasta {{ maxHorarios }} horarios por pecera, cada uno con sus días y sus
+        porciones.
       </p>
+      @if (sincronizacion(); as sync) {
+        <p class="af-badge" [class.af-badge--on]="sync.ok" [class.af-badge--off]="!sync.ok">
+          {{ sync.texto }}
+        </p>
+      }
     </header>
 
-    @if (pecera.horarios.length === 0) {
-      <div class="af-empty">
-        <h2>Esta pecera no tiene horarios</h2>
-        <p>Cuando se puedan editar, vas a poder armar la semana desde acá.</p>
-      </div>
-    } @else {
-      <ul class="af-schedule">
-        @for (horario of pecera.horarios; track horario.id) {
-          <li [class.af-schedule__off]="!horario.enabled">
-            <p class="af-schedule__time">{{ horario.time }}</p>
-            <div>
-              <p class="af-chips" aria-label="Días">
-                @for (dia of [1, 2, 3, 4, 5, 6, 7]; track dia) {
-                  <span class="af-chip" [class.af-chip--on]="horario.days.includes(dia)">
-                    {{ etiquetaDia(dia) }}
-                  </span>
-                }
-              </p>
-              <p class="af-schedule__dose">
-                {{ textoPorciones(horario.portions) }}
-                · {{ horario.enabled ? 'Activo' : 'Pausado' }}
-              </p>
-            </div>
-          </li>
+    <div class="af-sched-layout">
+      <section class="af-panel" aria-labelledby="titulo-plan">
+        <h2 id="titulo-plan">Plan rápido</h2>
+        <p class="af-hint">
+          Elegí cuántas veces por día y cuántas porciones. Las tomas se reparten parejas entre la
+          primera y la última.
+        </p>
+        @if (sugerencia(); as s) {
+          <p class="af-callout">
+            La ficha de {{ s.especie }} sugiere {{ s.tomas }}
+            {{ s.tomas === 1 ? 'toma' : 'tomas' }} por día.
+          </p>
         }
-      </ul>
-    }
+
+        <div class="af-plan-grid">
+          <label class="af-field">
+            <span>Tomas por día</span>
+            <select (change)="planTomas.set(+$any($event.target).value)">
+              @for (n of opcionesTomas; track n) {
+                <option [value]="n" [selected]="n === planTomas()">{{ n }}</option>
+              }
+            </select>
+          </label>
+          <label class="af-field">
+            <span>Porciones por toma</span>
+            <select (change)="planPorciones.set(+$any($event.target).value)">
+              @for (n of opcionesPorciones; track n) {
+                <option [value]="n" [selected]="n === planPorciones()">{{ n }}</option>
+              }
+            </select>
+          </label>
+          <label class="af-field">
+            <span>Primera toma</span>
+            <input
+              type="time"
+              [value]="planDesde()"
+              (change)="planDesde.set($any($event.target).value)"
+            />
+          </label>
+          <label class="af-field">
+            <span>Última toma</span>
+            <input
+              type="time"
+              [value]="planHasta()"
+              [disabled]="planTomas() === 1"
+              (change)="planHasta.set($any($event.target).value)"
+            />
+          </label>
+        </div>
+
+        <fieldset class="af-days">
+          <legend>Días</legend>
+          @for (dia of dias; track dia) {
+            <button
+              type="button"
+              class="af-day"
+              [attr.aria-pressed]="planDias().includes(dia)"
+              (click)="alternarDiaPlan(dia)"
+            >
+              {{ etiquetaDia(dia) }}
+            </button>
+          }
+        </fieldset>
+
+        <p class="af-hint">
+          @if (planDias().length === 0) {
+            Elegí al menos un día.
+          } @else {
+            Quedaría:
+            @for (h of vistaPlan(); track h.time; let ultimo = $last) {
+              <strong>{{ h.time }}</strong
+              >{{ ultimo ? '' : ', ' }}
+            }
+            · {{ textoPorciones(planPorciones()) }} cada una.
+          }
+        </p>
+        <button
+          type="button"
+          class="af-btn af-btn--ghost"
+          [disabled]="planDias().length === 0"
+          (click)="aplicarPlan()"
+        >
+          Reemplazar el calendario con este plan
+        </button>
+      </section>
+
+      <section class="af-panel" aria-labelledby="titulo-calendario">
+        <div class="af-panel__head">
+          <h2 id="titulo-calendario">Calendario</h2>
+          <button
+            type="button"
+            class="af-btn af-btn--ghost"
+            [disabled]="filas().length >= maxHorarios"
+            (click)="agregar()"
+          >
+            Agregar horario
+          </button>
+        </div>
+
+        @if (filas().length === 0) {
+          <div class="af-empty">
+            <h3>Sin horarios</h3>
+            <p>Armá un plan rápido o agregá un horario. Sin horarios, solo se alimenta a mano.</p>
+          </div>
+        } @else {
+          <ul class="af-sched-edit">
+            @for (fila of filas(); track fila.clave; let i = $index) {
+              <li [class.af-schedule__off]="!fila.enabled">
+                <div class="af-sched-edit__row">
+                  <label class="af-field af-field--time">
+                    <span class="af-sr">Hora del horario {{ i + 1 }}</span>
+                    <input
+                      type="time"
+                      required
+                      [value]="fila.time"
+                      (change)="cambiar(fila.clave, { time: $any($event.target).value })"
+                    />
+                  </label>
+                  <label class="af-field">
+                    <span class="af-sr">Porciones del horario {{ i + 1 }}</span>
+                    <select
+                      (change)="cambiar(fila.clave, { portions: +$any($event.target).value })"
+                    >
+                      @for (n of opcionesPorciones; track n) {
+                        <option [value]="n" [selected]="n === fila.portions">
+                          {{ textoPorciones(n) }}
+                        </option>
+                      }
+                    </select>
+                  </label>
+                  <label class="af-switch">
+                    <input
+                      type="checkbox"
+                      [checked]="fila.enabled"
+                      (change)="cambiar(fila.clave, { enabled: $any($event.target).checked })"
+                    />
+                    <span>{{ fila.enabled ? 'Activo' : 'Pausado' }}</span>
+                  </label>
+                  <button
+                    type="button"
+                    class="af-btn af-btn--ghost af-btn--small"
+                    (click)="quitar(fila.clave)"
+                  >
+                    Quitar
+                  </button>
+                </div>
+                <div class="af-days" role="group" [attr.aria-label]="'Días del horario ' + (i + 1)">
+                  @for (dia of dias; track dia) {
+                    <button
+                      type="button"
+                      class="af-day"
+                      [attr.aria-pressed]="fila.days.includes(dia)"
+                      (click)="alternarDia(fila, dia)"
+                    >
+                      {{ etiquetaDia(dia) }}
+                    </button>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        }
+
+        <dl class="af-week" aria-label="Resumen por día">
+          @for (dia of dias; track dia) {
+            <div>
+              <dt>{{ etiquetaDia(dia) }}</dt>
+              <dd>{{ textoDia(dia) }}</dd>
+            </div>
+          }
+        </dl>
+
+        @if (tocado() && error(); as problema) {
+          <p class="af-alert" role="alert">{{ problema }}</p>
+        }
+        @if (aviso(); as a) {
+          <p [class]="a.tipo === 'ok' ? 'af-ok' : 'af-alert'" role="status">{{ a.texto }}</p>
+        }
+
+        <div class="af-actions">
+          <button
+            type="button"
+            class="af-btn af-btn--primary"
+            [disabled]="!tocado() || !!error() || guardando()"
+            (click)="guardar()"
+          >
+            {{ guardando() ? 'Guardando…' : 'Guardar y enviar a la pecera' }}
+          </button>
+          @if (tocado()) {
+            <button type="button" class="af-btn af-btn--ghost" (click)="descartar()">
+              Descartar cambios
+            </button>
+          }
+        </div>
+      </section>
+    </div>
   } @else {
     <div class="af-empty">
       <h1>No encontramos esa pecera</h1>

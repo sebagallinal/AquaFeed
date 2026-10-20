@@ -10,3 +10,6 @@ export interface Horario {
   portions: number;
   enabled: boolean;
 }
+
+/** Horario mientras se edita: todavía no tiene id ni está guardado. */
+export type HorarioEditable = Pick<Horario, 'days' | 'time' | 'portions' | 'enabled'>;

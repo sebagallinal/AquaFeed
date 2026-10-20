@@ -7,8 +7,43 @@ const jwt = require('jsonwebtoken');
 const ZONA = 'America/Argentina/Buenos_Aires';
 const ONLINE_MS = 60 * 1000;   // más de 1 minuto sin telemetría = sin conexión
 const MAX_PORCIONES = 5;
+const MAX_HORARIOS = 8;   // por pecera; cada uno puede repetirse varios días de la semana
 
-module.exports = function apiV1({ db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, jwtSecret }) {
+// Valida el calendario que manda el frontend. Devuelve la lista normalizada o un mensaje de error.
+function validarHorarios(lista) {
+  if (!Array.isArray(lista)) return 'Faltan los horarios.';
+  if (lista.length > MAX_HORARIOS) return `Se pueden cargar hasta ${MAX_HORARIOS} horarios por pecera.`;
+  const vistos = new Set();
+  const horarios = [];
+  for (const h of lista) {
+    const days = Array.isArray(h?.days) ? [...new Set(h.days.map(Number))].sort((a, b) => a - b) : [];
+    if (days.length === 0 || days.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) {
+      return 'Cada horario necesita al menos un día de la semana.';
+    }
+    if (typeof h.time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(h.time)) {
+      return 'La hora tiene que tener el formato HH:MM.';
+    }
+    const portions = Number(h.portions);
+    if (!Number.isInteger(portions) || portions < 1 || portions > MAX_PORCIONES) {
+      return `Las porciones van de 1 a ${MAX_PORCIONES}.`;
+    }
+    const enabled = h.enabled !== false;
+    // Dos tomas activas el mismo día a la misma hora se ejecutarían juntas
+    if (enabled) {
+      for (const d of days) {
+        const clave = `${d}-${h.time}`;
+        if (vistos.has(clave)) return `Hay dos horarios activos el mismo día a las ${h.time}.`;
+        vistos.add(clave);
+      }
+    }
+    horarios.push({ days, time: h.time, portions, enabled });
+  }
+  return horarios;
+}
+
+module.exports = function apiV1({
+  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, publicarConfig, jwtSecret,
+}) {
   const router = express.Router();
 
   // Dispositivo del frontend: fila de la base + lo último que se supo por MQTT
@@ -24,7 +59,9 @@ module.exports = function apiV1({ db, deviceState, mqttClient, authenticateToken
       ownerId: row.usuario_id == null ? null : String(row.usuario_id),
       speciesProfileId: row.especie_id,
       tz: ZONA,
-      configVersion: 0,
+      configVersion: row.config_version ?? 0,
+      // Versión del calendario que el ESP32 confirmó en su último status (null: no informó)
+      configAplicada: Number.isInteger(vivo.status?.configVersion) ? vivo.status.configVersion : null,
       lastSeen,
       online,
       estado: row.usuario_id == null ? 'unclaimed' : 'claimed',
@@ -46,7 +83,11 @@ module.exports = function apiV1({ db, deviceState, mqttClient, authenticateToken
     };
   };
 
-  const toPecera = (row) => ({ dispositivo: toDispositivo(row), lectura: toLectura(row.id) });
+  const toPecera = (row, horarios = []) => ({
+    dispositivo: toDispositivo(row),
+    lectura: toLectura(row.id),
+    horarios,
+  });
 
   const toDispositivoAdmin = (row) => ({
     ...toDispositivo(row),
@@ -86,12 +127,35 @@ module.exports = function apiV1({ db, deviceState, mqttClient, authenticateToken
   });
 
   router.get('/peceras', authenticateToken, async (req, res) => {
-    res.json((await db.listDevices(req.user.id)).map(toPecera));
+    const rows = await db.listDevices(req.user.id);
+    const horarios = await db.listSchedules(rows.map((r) => r.id));
+    res.json(rows.map((row) => toPecera(row, horarios[row.id])));
   });
 
   router.get('/peceras/:id', authenticateToken, async (req, res) => {
     const row = await peceraPropia(req, res);
-    if (row) res.json(toPecera(row));
+    if (!row) return;
+    const horarios = await db.listSchedules([row.id]);
+    res.json(toPecera(row, horarios[row.id]));
+  });
+
+  // Reemplaza el calendario completo de la pecera y se lo manda al ESP32.
+  // Si el dispositivo está apagado lo recibe al reconectarse (el mensaje queda retenido).
+  router.put('/peceras/:id/horarios', authenticateToken, async (req, res) => {
+    const row = await peceraPropia(req, res);
+    if (!row) return;
+
+    const horarios = validarHorarios(req.body?.horarios);
+    if (typeof horarios === 'string') return res.status(400).json({ message: horarios });
+
+    const guardado = await db.replaceSchedules(row.id, horarios);
+    let enviado = false;
+    try {
+      enviado = mqttClient.connected && (await publicarConfig(row.id, guardado.version, guardado.horarios));
+    } catch (e) {
+      console.error(`❌ No se pudo publicar la config de ${row.id}:`, e.message);
+    }
+    res.json({ horarios: guardado.horarios, configVersion: guardado.version, enviado });
   });
 
   router.post('/peceras/:id/alimentar', authenticateToken, async (req, res) => {

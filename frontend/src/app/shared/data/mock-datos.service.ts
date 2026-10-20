@@ -1,11 +1,12 @@
-import { Injectable, Injector, inject, signal } from '@angular/core';
+import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { Observable, map, of, startWith, throwError } from 'rxjs';
 
 import { proximaAlimentacion } from '../fecha';
+import { validarHorarios } from '../horarios';
 import type { Alerta } from '../models/alerta.model';
 import type { Dispositivo } from '../models/dispositivo.model';
-import type { Horario } from '../models/horario.model';
+import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
 import type { Usuario } from '../models/usuario.model';
@@ -15,6 +16,7 @@ import {
   type AlertaVista,
   type ComandoAlimentacion,
   type DispositivoAdmin,
+  type HorariosGuardados,
   type PeceraDetalle,
   type PeceraResumen,
   type ResumenAdmin,
@@ -63,6 +65,7 @@ const DISPOSITIVOS: readonly Dispositivo[] = [
     speciesProfileId: 'sp-guppy',
     tz: ZONA,
     configVersion: 7,
+    configAplicada: 7,
     lastSeen: null,
     online: true,
     estado: 'claimed',
@@ -76,6 +79,7 @@ const DISPOSITIVOS: readonly Dispositivo[] = [
     speciesProfileId: 'sp-neon',
     tz: ZONA,
     configVersion: 4,
+    configAplicada: 4,
     lastSeen: null,
     online: true,
     estado: 'claimed',
@@ -89,6 +93,7 @@ const DISPOSITIVOS: readonly Dispositivo[] = [
     speciesProfileId: 'sp-molly',
     tz: ZONA,
     configVersion: 2,
+    configAplicada: 1,
     lastSeen: null,
     online: false,
     estado: 'claimed',
@@ -102,6 +107,7 @@ const DISPOSITIVOS: readonly Dispositivo[] = [
     speciesProfileId: null,
     tz: ZONA,
     configVersion: 0,
+    configAplicada: null,
     lastSeen: null,
     online: false,
     estado: 'unclaimed',
@@ -205,12 +211,24 @@ export class MockDatosService implements DatosApi {
 
   private readonly alertas$ = toObservable(this.alertas, { injector: this.injector });
 
+  /** Calendario editable en memoria y versión de cada pecera. */
+  private readonly horarios = signal<Horario[]>([...HORARIOS]);
+  private readonly versiones = signal(
+    new Map(
+      DISPOSITIVOS.map((d) => [d.id, { guardada: d.configVersion, aplicada: d.configAplicada }]),
+    ),
+  );
+  private readonly cambios$ = toObservable(
+    computed(() => [this.alertas(), this.horarios(), this.versiones()]),
+    { injector: this.injector },
+  );
+
   pecerasDe(usuarioId: string): Observable<PeceraResumen[]> {
     const actual = (): PeceraResumen[] =>
       DISPOSITIVOS.filter((dispositivo) => dispositivo.ownerId === usuarioId).map((dispositivo) =>
         this.resumen(dispositivo),
       );
-    return this.alertas$.pipe(
+    return this.cambios$.pipe(
       map(() => actual()),
       startWith(actual()),
     );
@@ -224,7 +242,7 @@ export class MockDatosService implements DatosApi {
       }
       return { ...this.resumen(dispositivo), horarios: this.horariosDe(id) };
     };
-    return this.alertas$.pipe(
+    return this.cambios$.pipe(
       map(() => actual()),
       startWith(actual()),
     );
@@ -285,6 +303,36 @@ export class MockDatosService implements DatosApi {
       portions,
       deviceId,
     });
+  }
+
+  guardarHorarios(
+    deviceId: string,
+    usuarioId: string,
+    horarios: HorarioEditable[],
+  ): Observable<HorariosGuardados> {
+    const dispositivo = DISPOSITIVOS.find(
+      (item) => item.id === deviceId && item.ownerId === usuarioId,
+    );
+    if (!dispositivo) {
+      return throwError(() => new PeceraNoDisponibleError());
+    }
+    const error = validarHorarios(horarios);
+    if (error) {
+      return throwError(() => new PeceraNoDisponibleError(error));
+    }
+    const nuevos: Horario[] = horarios.map((h, i) => ({
+      ...h,
+      days: [...h.days].sort((a, b) => a - b),
+      id: `${deviceId}-${Date.now()}-${i}`,
+      deviceId,
+    }));
+    const anterior = this.versiones().get(deviceId);
+    const version = (anterior?.guardada ?? 0) + 1;
+    // Una pecera en línea aplica el calendario enseguida; una apagada queda pendiente
+    const aplicada = dispositivo.online ? version : (anterior?.aplicada ?? null);
+    this.horarios.update((lista) => [...lista.filter((h) => h.deviceId !== deviceId), ...nuevos]);
+    this.versiones.update((mapa) => new Map(mapa).set(deviceId, { guardada: version, aplicada }));
+    return of({ horarios: nuevos, configVersion: version, enviado: dispositivo.online });
   }
 
   resumenAdmin(): Observable<ResumenAdmin> {
@@ -351,8 +399,14 @@ export class MockDatosService implements DatosApi {
     const vistos = lecturaActual?.ts
       ? new Date(lecturaActual.ts * 1000).toISOString()
       : dispositivo.lastSeen;
+    const version = this.versiones().get(dispositivo.id);
     return {
-      dispositivo: { ...dispositivo, lastSeen: vistos },
+      dispositivo: {
+        ...dispositivo,
+        lastSeen: vistos,
+        configVersion: version?.guardada ?? dispositivo.configVersion,
+        configAplicada: version?.aplicada ?? dispositivo.configAplicada,
+      },
       lectura: lecturaActual,
       proxima: proximaAlimentacion(this.horariosDe(dispositivo.id)),
       especie: ESPECIES.find((item) => item.id === dispositivo.speciesProfileId) ?? null,
@@ -363,7 +417,7 @@ export class MockDatosService implements DatosApi {
   }
 
   private horariosDe(deviceId: string): Horario[] {
-    return HORARIOS.filter((horario) => horario.deviceId === deviceId);
+    return this.horarios().filter((horario) => horario.deviceId === deviceId);
   }
 
   private dueno(deviceId: string): string | null {
