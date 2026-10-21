@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { catchError, EMPTY, map, Observable, of, switchMap, throwError, timer } from 'rxjs';
 
 import { proximaAlimentacion } from '../fecha';
+import type { ConfigAlertas } from '../models/alerta.model';
 import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
@@ -13,6 +14,7 @@ import {
   DatosApi,
   PeceraNoDisponibleError,
   type AlertaVista,
+  type CambiosPecera,
   type ComandoAlimentacion,
   type DispositivoAdmin,
   type HorariosGuardados,
@@ -45,7 +47,7 @@ interface PeceraBackend {
 
 /**
  * Datos del backend Express (`/api/v1`). El usuario sale del token, así que los `usuarioId`
- * de `DatosApi` no viajan. Lo que el backend todavía no tiene queda vacío: las alertas.
+ * de `DatosApi` no viajan.
  * Las fichas de especies siguen siendo las que trae el frontend.
  */
 @Injectable()
@@ -68,11 +70,58 @@ export class HttpDatosService implements DatosApi {
   }
 
   alertasDe(): Observable<AlertaVista[]> {
-    return of([]);
+    return this.enVivo(() => this.http.get<AlertaVista[]>(`${API}/alertas`));
   }
 
-  reconocerAlerta(): Observable<void> {
-    return throwError(() => new PeceraNoDisponibleError('No encontramos esa alerta.'));
+  reconocerAlerta(alertaId: string): Observable<void> {
+    return this.http
+      .post<void>(`${API}/alertas/${encodeURIComponent(alertaId)}/reconocer`, {})
+      .pipe(
+        catchError((error: unknown) =>
+          throwError(
+            () => new PeceraNoDisponibleError(mensajeDe(error, 'No se pudo reconocer la alerta.')),
+          ),
+        ),
+      );
+  }
+
+  editarPecera(
+    deviceId: string,
+    _usuarioId: string,
+    cambios: CambiosPecera,
+  ): Observable<PeceraResumen> {
+    return this.http
+      .patch<PeceraBackend>(`${API}/peceras/${encodeURIComponent(deviceId)}`, cambios)
+      .pipe(
+        map(resumen),
+        catchError((error: unknown) =>
+          throwError(
+            () =>
+              new PeceraNoDisponibleError(mensajeDe(error, 'No se pudieron guardar los cambios.')),
+          ),
+        ),
+      );
+  }
+
+  configAlertas(deviceId: string): Observable<ConfigAlertas> {
+    return this.http.get<ConfigAlertas>(`${API}/peceras/${encodeURIComponent(deviceId)}/alertas`);
+  }
+
+  guardarConfigAlertas(
+    deviceId: string,
+    _usuarioId: string,
+    config: ConfigAlertas,
+  ): Observable<ConfigAlertas> {
+    return this.http
+      .put<ConfigAlertas>(`${API}/peceras/${encodeURIComponent(deviceId)}/alertas`, config)
+      .pipe(
+        catchError((error: unknown) =>
+          throwError(
+            () =>
+              new PeceraNoDisponibleError(mensajeDe(error, 'No se pudieron guardar las alertas.')),
+          ),
+        ),
+      );
   }
 
   especies(): Observable<PerfilEspecie[]> {
@@ -165,7 +214,7 @@ export class HttpDatosService implements DatosApi {
   }
 
   alertasAdmin(): Observable<AlertaVista[]> {
-    return of([]);
+    return this.enVivo(() => this.http.get<AlertaVista[]>(`${API}/admin/alertas`));
   }
 
   /** Repite el pedido cada 5 s. Si uno falla, la pantalla se queda con el último valor. */
@@ -182,7 +231,7 @@ function resumen({ dispositivo, lectura, horarios }: PeceraBackend): PeceraResum
     lectura,
     proxima: proximaAlimentacion(horarios ?? []),
     especie: especieDe(dispositivo.speciesProfileId),
-    alertasAbiertas: 0,
+    alertasAbiertas: 0, // ninguna pantalla lo muestra por pecera; la lista sale de /alertas
   };
 }
 

@@ -79,3 +79,35 @@ ALTER TABLE dispositivos ADD COLUMN IF NOT EXISTS config_version INT NOT NULL DE
 -- programada: la ejecutó el ESP32 según el calendario. porciones: NULL en registros anteriores.
 ALTER TABLE alimentaciones MODIFY COLUMN origen ENUM('web','boton','programada') NOT NULL;
 ALTER TABLE alimentaciones ADD COLUMN IF NOT EXISTS porciones TINYINT NULL AFTER origen;
+
+-- Alertas configurables por pecera. Un límite en NULL no se controla.
+-- offline_min: minutos sin telemetría para avisar que se desconectó (NULL = no avisar).
+CREATE TABLE IF NOT EXISTS config_alertas (
+  dispositivo_id  VARCHAR(32)  NOT NULL PRIMARY KEY,
+  temp_min        DECIMAL(5,2) NULL,
+  temp_max        DECIMAL(5,2) NULL,
+  ph_min          DECIMAL(4,2) NULL,
+  ph_max          DECIMAL(4,2) NULL,
+  tds_min         DECIMAL(7,2) NULL,
+  tds_max         DECIMAL(7,2) NULL,
+  offline_min     SMALLINT     NULL DEFAULT 10,
+  actualizado_en  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_config_alertas_disp FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- abierta: pasa ahora y nadie la vio · reconocida: el usuario la vio pero sigue pasando ·
+-- cerrada: se normalizó sola. Por pecera y tipo hay como mucho una alerta no cerrada.
+CREATE TABLE IF NOT EXISTS alertas (
+  id              BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  dispositivo_id  VARCHAR(32)  NOT NULL,
+  tipo            ENUM('parametro','offline') NOT NULL,
+  parametro       ENUM('waterTempC','ph','tdsPpm') NULL,
+  estado          ENUM('abierta','reconocida','cerrada') NOT NULL DEFAULT 'abierta',
+  mensaje         VARCHAR(255) NOT NULL,
+  valor           DECIMAL(8,2) NULL,
+  abierta_en      DATETIME(3)  NOT NULL,
+  reconocida_en   DATETIME(3)  NULL,
+  cerrada_en      DATETIME(3)  NULL,
+  INDEX idx_alertas_disp_estado (dispositivo_id, estado),
+  CONSTRAINT fk_alertas_disp FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

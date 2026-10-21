@@ -23,12 +23,6 @@
 
   <figure class="af-hero-photo">
     <img [src]="ficha.foto.src" [alt]="ficha.foto.alt" width="960" height="600" />
-    <figcaption>
-      Foto:
-      <a [href]="ficha.foto.pagina">{{ ficha.foto.autor }}</a>
-      ·
-      <a [href]="ficha.foto.licenciaUrl">{{ ficha.foto.licencia }}</a>
-    </figcaption>
   </figure>
 
   @if (ficha.notaAcuario) {

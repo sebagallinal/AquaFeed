@@ -1,0 +1,38 @@
+<section class="af-page">
+  <a class="af-back" routerLink="..">Volver a especies</a>
+
+  <header class="af-page-head">
+    <h1>Créditos de las fotos</h1>
+    <p>
+      Las fotos de las fichas son de Wikimedia Commons. Se redujeron de tamaño y se guardaron en
+      WebP, sin cambiar su contenido.
+    </p>
+  </header>
+
+  <div class="af-table-wrap">
+    <table class="af-table">
+      <thead>
+        <tr>
+          <th scope="col">Especie</th>
+          <th scope="col">Autor</th>
+          <th scope="col">Licencia</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (e of especies; track e.id) {
+          <tr>
+            <th scope="row">{{ e.nombre }}</th>
+            <td>
+              <a [href]="e.foto.pagina" target="_blank" rel="noopener">{{ e.foto.autor }}</a>
+            </td>
+            <td>
+              <a [href]="e.foto.licenciaUrl" target="_blank" rel="noopener">{{
+                e.foto.licencia
+              }}</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

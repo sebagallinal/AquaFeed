@@ -2,7 +2,7 @@ import { InjectionToken } from '@angular/core';
 import type { Observable } from 'rxjs';
 
 import type { ProximaAlimentacion } from '../fecha';
-import type { Alerta } from '../models/alerta.model';
+import type { Alerta, ConfigAlertas } from '../models/alerta.model';
 import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
@@ -20,6 +20,11 @@ export interface PeceraResumen {
 
 export interface PeceraDetalle extends PeceraResumen {
   horarios: Horario[];
+}
+
+export interface CambiosPecera {
+  nombre?: string;
+  especieId?: string | null;
 }
 
 export interface AlertaVista extends Alerta {
@@ -73,6 +78,18 @@ export interface DatosApi {
   especies(): Observable<PerfilEspecie[]>;
   especie(slug: string): Observable<PerfilEspecie | null>;
   alimentar(deviceId: string, usuarioId: string, portions: number): Observable<ComandoAlimentacion>;
+  /** Cambia el nombre o la especie (null = sin especie). Devuelve la pecera actualizada. */
+  editarPecera(
+    deviceId: string,
+    usuarioId: string,
+    cambios: CambiosPecera,
+  ): Observable<PeceraResumen>;
+  configAlertas(deviceId: string, usuarioId: string): Observable<ConfigAlertas>;
+  guardarConfigAlertas(
+    deviceId: string,
+    usuarioId: string,
+    config: ConfigAlertas,
+  ): Observable<ConfigAlertas>;
   /** Lecturas y alimentaciones del período. null si la pecera no existe o no es del usuario. */
   reporte(
     deviceId: string,

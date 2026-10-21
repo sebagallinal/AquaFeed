@@ -1,0 +1,130 @@
+<section class="af-page">
+  <a class="af-back" [routerLink]="['/app/dispositivos', id()]">Volver a la pecera</a>
+
+  @if (detalle() === undefined || !cargada()) {
+    <p>Cargando alertas…</p>
+  } @else if (detalle(); as pecera) {
+    <header class="af-page-head">
+      <p class="af-kicker">{{ pecera.dispositivo.nombre }}</p>
+      <h1>Alertas</h1>
+      <p>
+        Elegí cuándo avisarte. Una alerta se abre si el valor queda fuera de los límites durante más
+        de un minuto, y se cierra sola cuando vuelve a la normalidad.
+      </p>
+    </header>
+
+    <form class="af-panel af-alert-form" (submit)="$event.preventDefault(); guardar()">
+      @for (s of sensores; track s.clave) {
+        <fieldset class="af-alert-row" [class.af-alert-row--off]="!fila(s.clave).activo">
+          <legend class="af-sr">{{ s.nombre }}</legend>
+          <div class="af-alert-row__head">
+            <label class="af-switch">
+              <input
+                type="checkbox"
+                [checked]="fila(s.clave).activo"
+                (change)="cambiar(s.clave, { activo: $any($event.target).checked })"
+              />
+              <strong>{{ s.nombre }}</strong>
+            </label>
+            @if (lecturaActual(s); as actual) {
+              <span class="af-hint">Ahora: {{ actual }}</span>
+            }
+          </div>
+
+          <div class="af-alert-row__limits">
+            <label class="af-field">
+              <span>Avisar si baja de</span>
+              <input
+                type="text"
+                inputmode="decimal"
+                [placeholder]="'Sin mínimo'"
+                [disabled]="!fila(s.clave).activo"
+                [value]="fila(s.clave).min"
+                (input)="cambiar(s.clave, { min: $any($event.target).value })"
+              />
+            </label>
+            <label class="af-field">
+              <span>Avisar si sube de</span>
+              <input
+                type="text"
+                inputmode="decimal"
+                [placeholder]="'Sin máximo'"
+                [disabled]="!fila(s.clave).activo"
+                [value]="fila(s.clave).max"
+                (input)="cambiar(s.clave, { max: $any($event.target).value })"
+              />
+            </label>
+            <span class="af-alert-row__unit">{{ s.unidad }}</span>
+          </div>
+
+          @if (rangoEspecie(s.clave) && especie(); as e) {
+            <button type="button" class="af-link-btn" (click)="usarRangoEspecie(s.clave)">
+              Usar el rango ideal de {{ e.nombre }} ({{ textoRango(s.clave, s.unidad) }})
+            </button>
+          }
+        </fieldset>
+      }
+
+      <fieldset class="af-alert-row" [class.af-alert-row--off]="!offlineActivo()">
+        <legend class="af-sr">Desconexión</legend>
+        <div class="af-alert-row__head">
+          <label class="af-switch">
+            <input
+              type="checkbox"
+              [checked]="offlineActivo()"
+              (change)="cambiarOffline($any($event.target).checked)"
+            />
+            <strong>Desconexión</strong>
+          </label>
+          <span class="af-hint">
+            {{ pecera.dispositivo.online ? 'Ahora: en línea' : 'Ahora: sin conexión' }}
+          </span>
+        </div>
+        <div class="af-alert-row__limits">
+          <label class="af-field">
+            <span>Avisar si no llegan datos durante</span>
+            <select
+              [disabled]="!offlineActivo()"
+              (change)="cambiarOffline(true, +$any($event.target).value)"
+            >
+              @for (m of minutos; track m) {
+                <option [value]="m" [selected]="m === offlineMin()">
+                  {{ textoMinutos(m) }}
+                </option>
+              }
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      @if (!especie()) {
+        <p class="af-hint">
+          Asignale una especie a la pecera (botón «Editar») para poder usar sus rangos ideales.
+        </p>
+      }
+
+      @if (tocado() && error(); as problema) {
+        <p class="af-alert" role="alert">{{ problema }}</p>
+      }
+      @if (aviso(); as a) {
+        <p [class]="a.tipo === 'ok' ? 'af-ok' : 'af-alert'" role="status">{{ a.texto }}</p>
+      }
+
+      <div class="af-actions">
+        <button
+          type="submit"
+          class="af-btn af-btn--primary"
+          [disabled]="!tocado() || !!error() || guardando()"
+        >
+          {{ guardando() ? 'Guardando…' : 'Guardar alertas' }}
+        </button>
+        <a class="af-btn af-btn--ghost" routerLink="/app/alertas">Ver alertas</a>
+      </div>
+    </form>
+  } @else {
+    <div class="af-empty">
+      <h1>No encontramos esa pecera</h1>
+      <p>Puede que no exista o que no sea tuya.</p>
+    </div>
+  }
+</section>

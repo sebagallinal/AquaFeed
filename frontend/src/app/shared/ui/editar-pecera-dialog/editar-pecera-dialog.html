@@ -1,0 +1,43 @@
+<h2 mat-dialog-title>Editar pecera</h2>
+<form (submit)="$event.preventDefault(); guardar()">
+  <mat-dialog-content class="af-dialog-form">
+    <label class="af-field">
+      <span>Nombre</span>
+      <input
+        type="text"
+        maxlength="60"
+        required
+        autocomplete="off"
+        [value]="nombre()"
+        (input)="nombre.set($any($event.target).value)"
+      />
+    </label>
+
+    <label class="af-field">
+      <span>Especie</span>
+      <select (change)="especieId.set($any($event.target).value)">
+        <option value="" [selected]="!especieId()">Sin especie</option>
+        @for (e of especies; track e.id) {
+          <option [value]="e.id" [selected]="e.id === especieId()">{{ e.nombre }}</option>
+        }
+      </select>
+    </label>
+
+    <p class="af-hint">
+      @if (elegida(); as e) {
+        Los reportes y la sugerencia de horarios van a usar los rangos de {{ e.nombre }}. Las
+        alertas no cambian solas: revisalas en «Alertas» de esta pecera.
+      } @else {
+        Sin especie no hay rangos para comparar las lecturas.
+      }
+    </p>
+
+    @if (error(); as e) {
+      <p class="af-alert" role="alert">{{ e }}</p>
+    }
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button type="button" mat-button mat-dialog-close>Cancelar</button>
+    <button type="submit" mat-flat-button [disabled]="!!error()">Guardar</button>
+  </mat-dialog-actions>
+</form>

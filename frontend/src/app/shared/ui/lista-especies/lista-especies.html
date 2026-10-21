@@ -126,11 +126,11 @@
             <p>{{ cta() }}</p>
           </div>
         </a>
-        <p class="af-photo-credit">
-          Foto: {{ especie.foto.autor }}.
-          <a [href]="especie.foto.licenciaUrl">{{ especie.foto.licencia }}</a>
-        </p>
       </article>
     }
   </div>
 }
+
+<p class="af-credits-link">
+  <a [routerLink]="rutaDe() + '/creditos'">Créditos de las fotos</a>
+</p>

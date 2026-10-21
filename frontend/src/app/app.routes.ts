@@ -35,6 +35,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/usuario/pecera/pecera').then((m) => m.Pecera),
       },
       {
+        path: 'dispositivos/:id/alertas',
+        data: { titulo: 'Alertas de la pecera' },
+        loadComponent: () =>
+          import('./features/usuario/alertas-pecera/alertas-pecera').then((m) => m.AlertasPecera),
+      },
+      {
         path: 'dispositivos/:id/horarios',
         data: { titulo: 'Horarios' },
         loadComponent: () => import('./features/usuario/horarios/horarios').then((m) => m.Horarios),
@@ -53,6 +59,12 @@ export const routes: Routes = [
         path: 'especies',
         data: { titulo: 'Especies' },
         loadComponent: () => import('./features/usuario/especies/especies').then((m) => m.Especies),
+      },
+      {
+        path: 'especies/creditos',
+        data: { titulo: 'Créditos de las fotos' },
+        loadComponent: () =>
+          import('./features/especies-creditos/creditos-fotos').then((m) => m.CreditosFotos),
       },
       {
         path: 'especies/:slug',
@@ -102,6 +114,12 @@ export const routes: Routes = [
         data: { titulo: 'Perfiles de especie' },
         loadComponent: () =>
           import('./features/admin/especies/especies').then((m) => m.EspeciesAdmin),
+      },
+      {
+        path: 'especies/creditos',
+        data: { titulo: 'Créditos de las fotos' },
+        loadComponent: () =>
+          import('./features/especies-creditos/creditos-fotos').then((m) => m.CreditosFotos),
       },
       {
         path: 'especies/:id',

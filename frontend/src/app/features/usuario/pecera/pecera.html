@@ -16,13 +16,19 @@
           }
         </p>
       </div>
-      <span
-        class="af-badge"
-        [class.af-badge--on]="pecera.dispositivo.online"
-        [class.af-badge--off]="!pecera.dispositivo.online"
-      >
-        {{ pecera.dispositivo.online ? 'En línea' : 'Sin conexión' }}
-      </span>
+      <div class="af-head-actions">
+        <span
+          class="af-badge"
+          [class.af-badge--on]="pecera.dispositivo.online"
+          [class.af-badge--off]="!pecera.dispositivo.online"
+        >
+          {{ pecera.dispositivo.online ? 'En línea' : 'Sin conexión' }}
+        </span>
+        <button type="button" class="af-btn af-btn--ghost af-btn--small" (click)="editar(pecera)">
+          <mat-icon aria-hidden="true">edit</mat-icon>
+          Editar
+        </button>
+      </div>
     </header>
 
     <dl class="af-metrics af-metrics--plain">
@@ -61,6 +67,12 @@
         [queryParams]="{ pecera: pecera.dispositivo.id }"
       >
         Ver reportes
+      </a>
+      <a
+        class="af-btn af-btn--ghost"
+        [routerLink]="['/app/dispositivos', pecera.dispositivo.id, 'alertas']"
+      >
+        Alertas
       </a>
       @if (pecera.especie) {
         <a class="af-btn af-btn--ghost" [routerLink]="['/app/especies', pecera.especie.slug]">

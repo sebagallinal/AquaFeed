@@ -28,7 +28,7 @@ app.use(cors({
     /^http:\/\/\d+\.\d+\.\d+\.\d+:4200$/, // Cualquier IP con puerto 4200
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
@@ -73,6 +73,10 @@ const mqttClient = mqtt.connect(MQTT_URL, {
 
 const deviceState = {}; // última lectura de cada device (se carga de la base al iniciar)
 
+// Alertas configurables (rangos de cada sensor y desconexión), ver alertas.js
+const alertas = require('./alertas')({ db, deviceState });
+let alertasListas = false; // hasta cargar la base no se evalúa, para no duplicar alertas abiertas
+
 // Vista en vivo: deviceState se actualiza con cada mensaje (el ESP32 publica cada 5 s).
 // Reportes: a la base va una sola lectura por dispositivo y tipo cada SAVE_INTERVAL_MS.
 const SAVE_INTERVAL_MS = Number(process.env.SAVE_INTERVAL_MS) || 5 * 60 * 1000;
@@ -105,6 +109,7 @@ async function onMessageV1(id, tipo, data, ahora) {
     // Mismo formato que el firmware anterior, para que el dashboard no distinga versiones
     const agua = { id, tempAgua: data.waterTempC ?? null, ph: data.ph ?? null, tdsPpm: data.tdsPpm ?? null };
     await registrarLectura(id, 'agua', agua, ahora);
+    if (alertasListas) await alertas.evaluarTelemetria(id, data);
   } else if (tipo === 'status') {
     deviceState[id] ??= {};
     deviceState[id].status = { ...data, ts: ahora.toISOString() };
@@ -385,7 +390,7 @@ app.post('/api/devices/:id/alimentar', authenticateToken, async (req, res) => {
 
 // API del frontend nuevo (frontend/)
 app.use('/api/v1', require('./api-v1')({
-  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, publicarConfig,
+  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, publicarConfig, alertas,
   jwtSecret: JWT_SECRET,
 }));
 
@@ -436,6 +441,13 @@ db.init()
       deviceState[id] = { ...guardado, ...deviceState[id] };
     }
     console.log('🗄️  Base de datos conectada');
+    return alertas.init().then(() => {
+      alertasListas = true;
+      alertas.iniciarRevision();
+      console.log('🚨 Alertas activas');
+    });
+  })
+  .then(() => {
     app.listen(PORT, () => {
       console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
       console.log(`📡 API disponible en http://localhost:${PORT}/api`);

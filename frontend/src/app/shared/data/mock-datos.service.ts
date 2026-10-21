@@ -4,7 +4,7 @@ import { Observable, map, of, startWith, throwError } from 'rxjs';
 
 import { proximaAlimentacion } from '../fecha';
 import { validarHorarios } from '../horarios';
-import type { Alerta } from '../models/alerta.model';
+import { CONFIG_ALERTAS_DEFECTO, type Alerta, type ConfigAlertas } from '../models/alerta.model';
 import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
@@ -20,6 +20,7 @@ import {
   DatosApi,
   PeceraNoDisponibleError,
   type AlertaVista,
+  type CambiosPecera,
   type ComandoAlimentacion,
   type DispositivoAdmin,
   type HorariosGuardados,
@@ -224,8 +225,11 @@ export class MockDatosService implements DatosApi {
       DISPOSITIVOS.map((d) => [d.id, { guardada: d.configVersion, aplicada: d.configAplicada }]),
     ),
   );
+  /** Nombre y especie que cambió el dueño, por pecera. */
+  private readonly ediciones = signal(new Map<string, CambiosPecera>());
+  private readonly configs = new Map<string, ConfigAlertas>();
   private readonly cambios$ = toObservable(
-    computed(() => [this.alertas(), this.horarios(), this.versiones()]),
+    computed(() => [this.alertas(), this.horarios(), this.versiones(), this.ediciones()]),
     { injector: this.injector },
   );
 
@@ -322,6 +326,61 @@ export class MockDatosService implements DatosApi {
     return of(dispositivo ? reporteSimulado(deviceId, dias, this.horariosDe(deviceId)) : null);
   }
 
+  editarPecera(
+    deviceId: string,
+    usuarioId: string,
+    cambios: CambiosPecera,
+  ): Observable<PeceraResumen> {
+    const dispositivo = DISPOSITIVOS.find(
+      (item) => item.id === deviceId && item.ownerId === usuarioId,
+    );
+    if (!dispositivo) {
+      return throwError(() => new PeceraNoDisponibleError());
+    }
+    const nombre = cambios.nombre?.trim();
+    if (cambios.nombre !== undefined && (!nombre || nombre.length > 60)) {
+      return throwError(
+        () => new PeceraNoDisponibleError('El nombre tiene que tener entre 1 y 60 caracteres.'),
+      );
+    }
+    const anterior = this.ediciones().get(deviceId) ?? {};
+    const nuevo: CambiosPecera = {
+      ...anterior,
+      ...(nombre !== undefined ? { nombre } : {}),
+      ...(cambios.especieId !== undefined ? { especieId: cambios.especieId } : {}),
+    };
+    this.ediciones.update((mapa) => new Map(mapa).set(deviceId, nuevo));
+    return of(this.resumen(dispositivo));
+  }
+
+  configAlertas(deviceId: string): Observable<ConfigAlertas> {
+    return of({ ...(this.configs.get(deviceId) ?? CONFIG_ALERTAS_DEFECTO) });
+  }
+
+  guardarConfigAlertas(
+    deviceId: string,
+    _usuarioId: string,
+    config: ConfigAlertas,
+  ): Observable<ConfigAlertas> {
+    const pares: [number | null, number | null, string][] = [
+      [config.tempMin, config.tempMax, 'temperatura'],
+      [config.phMin, config.phMax, 'pH'],
+      [config.tdsMin, config.tdsMax, 'TDS'],
+    ];
+    for (const [min, max, nombre] of pares) {
+      if (min !== null && max !== null && min >= max) {
+        return throwError(
+          () =>
+            new PeceraNoDisponibleError(
+              `En ${nombre}, el mínimo tiene que ser menor que el máximo.`,
+            ),
+        );
+      }
+    }
+    this.configs.set(deviceId, { ...config });
+    return of({ ...config });
+  }
+
   guardarHorarios(
     deviceId: string,
     usuarioId: string,
@@ -411,7 +470,14 @@ export class MockDatosService implements DatosApi {
     };
   }
 
-  private resumen(dispositivo: Dispositivo): PeceraResumen {
+  private resumen(original: Dispositivo): PeceraResumen {
+    const edicion = this.ediciones().get(original.id);
+    const dispositivo: Dispositivo = {
+      ...original,
+      nombre: edicion?.nombre ?? original.nombre,
+      speciesProfileId:
+        edicion?.especieId !== undefined ? edicion.especieId : original.speciesProfileId,
+    };
     const lecturaActual = this.lecturas.get(dispositivo.id) ?? null;
     const vistos = lecturaActual?.ts
       ? new Date(lecturaActual.ts * 1000).toISOString()

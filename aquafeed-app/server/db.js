@@ -245,6 +245,114 @@ async function getReport(deviceId, desde, hasta) {
   };
 }
 
+// Nombre y especie que elige el dueño. Solo cambia lo que viene definido.
+async function updateDevice(id, { nombre, especieId }) {
+  if (nombre !== undefined) {
+    await pool.query('UPDATE dispositivos SET nombre = ? WHERE id = ?', [nombre, id]);
+  }
+  if (especieId !== undefined) {
+    await pool.query('UPDATE dispositivos SET especie_id = ? WHERE id = ?', [especieId, id]);
+  }
+}
+
+// ---------- Alertas ----------
+
+// Sin fila guardada: solo avisa si se desconecta más de 10 minutos
+const CONFIG_ALERTAS_DEFECTO = {
+  tempMin: null, tempMax: null, phMin: null, phMax: null, tdsMin: null, tdsMax: null, offlineMin: 10,
+};
+
+const toConfigAlertas = (r) => ({
+  tempMin: r.temp_min, tempMax: r.temp_max,
+  phMin: r.ph_min, phMax: r.ph_max,
+  tdsMin: r.tds_min, tdsMax: r.tds_max,
+  offlineMin: r.offline_min,
+});
+
+// { [deviceId]: config } con la configuración guardada de cada dispositivo
+async function listAlertConfigs() {
+  const [rows] = await pool.query('SELECT * FROM config_alertas');
+  return Object.fromEntries(rows.map((r) => [r.dispositivo_id, toConfigAlertas(r)]));
+}
+
+async function getAlertConfig(deviceId) {
+  const [rows] = await pool.query('SELECT * FROM config_alertas WHERE dispositivo_id = ?', [deviceId]);
+  return rows[0] ? toConfigAlertas(rows[0]) : { ...CONFIG_ALERTAS_DEFECTO };
+}
+
+async function saveAlertConfig(deviceId, c) {
+  await pool.query(
+    `INSERT INTO config_alertas (dispositivo_id, temp_min, temp_max, ph_min, ph_max, tds_min, tds_max, offline_min)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE temp_min = VALUES(temp_min), temp_max = VALUES(temp_max),
+       ph_min = VALUES(ph_min), ph_max = VALUES(ph_max), tds_min = VALUES(tds_min),
+       tds_max = VALUES(tds_max), offline_min = VALUES(offline_min)`,
+    [deviceId, c.tempMin, c.tempMax, c.phMin, c.phMax, c.tdsMin, c.tdsMax, c.offlineMin]
+  );
+}
+
+async function openAlert({ deviceId, tipo, parametro = null, mensaje, valor = null, fecha }) {
+  const [r] = await pool.query(
+    `INSERT INTO alertas (dispositivo_id, tipo, parametro, mensaje, valor, abierta_en)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [deviceId, tipo, parametro, mensaje, valor, fecha]
+  );
+  return r.insertId;
+}
+
+async function closeAlert(id, fecha) {
+  await pool.query(
+    "UPDATE alertas SET estado = 'cerrada', cerrada_en = ? WHERE id = ? AND estado <> 'cerrada'",
+    [fecha, id]
+  );
+}
+
+// Alertas que siguen pasando (abiertas o reconocidas), para retomar el estado al reiniciar
+async function listActiveAlerts() {
+  const [rows] = await pool.query("SELECT * FROM alertas WHERE estado <> 'cerrada'");
+  return rows;
+}
+
+const toAlerta = (r) => ({
+  id: String(r.id),
+  deviceId: r.dispositivo_id,
+  tipo: r.tipo,
+  estado: r.estado,
+  mensaje: r.mensaje,
+  abiertaEn: r.abierta_en.toISOString(),
+  cerradaEn: r.cerrada_en ? r.cerrada_en.toISOString() : null,
+  ...(r.parametro ? { parametro: r.parametro } : {}),
+  nombrePecera: r.nombre_pecera,
+});
+
+// Las que siguen pasando y las cerradas de los últimos 30 días; de un dueño o de todos
+async function listAlerts(ownerId) {
+  const [rows] = await pool.query(
+    `SELECT a.*, d.nombre AS nombre_pecera FROM alertas a JOIN dispositivos d ON d.id = a.dispositivo_id
+      WHERE (a.estado <> 'cerrada' OR a.cerrada_en > UTC_TIMESTAMP() - INTERVAL 30 DAY)
+        ${ownerId === undefined ? '' : 'AND d.usuario_id = ?'}
+      ORDER BY (a.estado = 'cerrada'), a.abierta_en DESC LIMIT 200`,
+    ownerId === undefined ? [] : [ownerId]
+  );
+  return rows.map(toAlerta);
+}
+
+// Pasa a reconocida solo si es del dueño y sigue abierta. Devuelve true si la encontró.
+async function acknowledgeAlert(id, ownerId) {
+  const [r] = await pool.query(
+    `UPDATE alertas a JOIN dispositivos d ON d.id = a.dispositivo_id
+        SET a.estado = 'reconocida', a.reconocida_en = UTC_TIMESTAMP(3)
+      WHERE a.id = ? AND d.usuario_id = ? AND a.estado = 'abierta'`,
+    [id, ownerId]
+  );
+  return r.affectedRows > 0;
+}
+
+async function countOpenAlerts() {
+  const [[{ n }]] = await pool.query("SELECT COUNT(*) AS n FROM alertas WHERE estado = 'abierta'");
+  return n;
+}
+
 // Última lectura de cada tipo por dispositivo, para no arrancar con el dashboard vacío
 async function getLatestState() {
   const state = {};
@@ -276,5 +384,7 @@ module.exports = {
   pool, init, toApiUser, findUserByLogin, listUsers, countUsers,
   toUsuario, listUsuarios, findUserById, listDevices, getDevice,
   saveReading, saveFeeding, getHistory, getFeedings, getLatestState,
-  listSchedules, replaceSchedules, getReport,
+  listSchedules, replaceSchedules, getReport, updateDevice,
+  CONFIG_ALERTAS_DEFECTO, listAlertConfigs, getAlertConfig, saveAlertConfig,
+  openAlert, closeAlert, listActiveAlerts, listAlerts, acknowledgeAlert, countOpenAlerts,
 };

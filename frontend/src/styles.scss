@@ -1879,3 +1879,127 @@ h2 .af-badge {
 .af-chart > .af-legend:first-child {
   margin: 0 0 8px;
 }
+
+/* ---------- Editar pecera y alertas ---------- */
+
+.af-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.af-head-actions .af-btn--small {
+  margin-left: 0;
+}
+
+.af-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.af-dialog-form .af-hint,
+.af-dialog-form .af-alert {
+  margin: 0;
+}
+
+.af-alert-form {
+  max-width: 720px;
+}
+
+.af-alert-row {
+  border: 0;
+  border-bottom: 1px solid var(--af-line);
+  margin: 0;
+  padding: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.af-alert-row__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.af-alert-row__head .af-hint {
+  margin: 0;
+}
+
+.af-alert-row__head .af-switch strong {
+  color: var(--af-ink);
+  font-size: 1.05rem;
+}
+
+.af-alert-row__limits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.af-alert-row__limits .af-field {
+  flex: 1 1 160px;
+}
+
+.af-alert-row__unit {
+  color: var(--af-muted);
+  font-weight: 650;
+  padding-bottom: 10px;
+  min-width: 2.5rem;
+}
+
+.af-alert-row--off .af-alert-row__limits {
+  opacity: 0.55;
+}
+
+.af-link-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 650;
+  color: var(--af-deep-2);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.af-alerts li {
+  align-items: flex-start;
+}
+
+.af-alerts h3 {
+  margin: 4px 0;
+  font-size: 1.05rem;
+}
+
+.af-alerts__seen {
+  opacity: 0.8;
+}
+
+.af-alerts--history li {
+  padding: 12px 18px;
+  background: transparent;
+}
+
+.af-alerts--history p {
+  margin: 2px 0;
+}
+
+.af-credits-link {
+  margin: 16px 0 0;
+  font-size: 0.85rem;
+}
+
+.af-credits-link a {
+  color: var(--af-muted);
+}

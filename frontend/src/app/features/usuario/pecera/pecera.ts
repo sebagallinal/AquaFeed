@@ -5,12 +5,17 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
 
 import { AUTH_API } from '../../../core/auth/auth-api';
-import { DATOS_API, type PeceraDetalle } from '../../../shared/data/datos-api';
+import { DATOS_API, type CambiosPecera, type PeceraDetalle } from '../../../shared/data/datos-api';
+import { ESPECIES } from '../../../shared/data/especies.mock';
 import { haceCuanto, textoPh, textoPorciones, textoTds, textoTemp } from '../../../shared/formato';
 import {
   AlimentarDialog,
   type AlimentarDialogData,
 } from '../../../shared/ui/alimentar-dialog/alimentar-dialog';
+import {
+  EditarPeceraDialog,
+  type EditarPeceraData,
+} from '../../../shared/ui/editar-pecera-dialog/editar-pecera-dialog';
 
 @Component({
   selector: 'app-pecera',
@@ -37,6 +42,39 @@ export class Pecera {
       const usuarioId = this.auth.usuario()?.id ?? '';
       const sub = this.datos.pecera(id, usuarioId).subscribe((valor) => this.detalle.set(valor));
       onCleanup(() => sub.unsubscribe());
+    });
+  }
+
+  protected editar(pecera: PeceraDetalle): void {
+    const ref = this.dialog.open<EditarPeceraDialog, EditarPeceraData, CambiosPecera>(
+      EditarPeceraDialog,
+      {
+        data: {
+          nombre: pecera.dispositivo.nombre,
+          especieId: pecera.dispositivo.speciesProfileId,
+          especies: ESPECIES,
+        },
+        width: 'min(460px, calc(100vw - 32px))',
+      },
+    );
+    ref.afterClosed().subscribe((cambios) => {
+      if (!cambios) {
+        return;
+      }
+      this.datos
+        .editarPecera(pecera.dispositivo.id, this.auth.usuario()?.id ?? '', cambios)
+        .subscribe({
+          next: (actualizada) => {
+            // Se ve el cambio enseguida, sin esperar el próximo refresco
+            this.detalle.update((d) => (d ? { ...d, ...actualizada } : d));
+            this.snack.open('Cambios guardados.', 'Cerrar', { duration: 4000 });
+          },
+          error: (error: unknown) => {
+            const mensaje =
+              error instanceof Error ? error.message : 'No se pudieron guardar los cambios.';
+            this.snack.open(mensaje, 'Cerrar', { duration: 5000 });
+          },
+        });
     });
   }
 

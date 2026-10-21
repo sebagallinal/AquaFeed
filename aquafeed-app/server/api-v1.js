@@ -41,8 +41,49 @@ function validarHorarios(lista) {
   return horarios;
 }
 
+// Rangos posibles de cada sensor: un valor fuera de esto es un error de tipeo, no un límite
+const LIMITES_ALERTA = {
+  temp: { min: -5, max: 50, nombre: 'temperatura' },
+  ph: { min: 0, max: 14, nombre: 'pH' },
+  tds: { min: 0, max: 5000, nombre: 'TDS' },
+};
+
+// Valida la configuración de alertas. Devuelve la config normalizada o un mensaje de error.
+function validarConfigAlertas(body) {
+  const config = {};
+  for (const [clave, rango] of Object.entries(LIMITES_ALERTA)) {
+    for (const lado of ['Min', 'Max']) {
+      const crudo = body?.[`${clave}${lado}`];
+      if (crudo === null || crudo === undefined || crudo === '') {
+        config[`${clave}${lado}`] = null;
+        continue;
+      }
+      const valor = Number(crudo);
+      if (!Number.isFinite(valor) || valor < rango.min || valor > rango.max) {
+        return `Los límites de ${rango.nombre} van de ${rango.min} a ${rango.max}.`;
+      }
+      config[`${clave}${lado}`] = Math.round(valor * 100) / 100;
+    }
+    const min = config[`${clave}Min`];
+    const max = config[`${clave}Max`];
+    if (min !== null && max !== null && min >= max) {
+      return `En ${rango.nombre}, el mínimo tiene que ser menor que el máximo.`;
+    }
+  }
+  const offline = body?.offlineMin;
+  if (offline === null || offline === undefined || offline === '') {
+    config.offlineMin = null;
+  } else if (!Number.isInteger(Number(offline)) || offline < 2 || offline > 1440) {
+    return 'El aviso de desconexión va de 2 minutos a 24 horas.';
+  } else {
+    config.offlineMin = Number(offline);
+  }
+  return config;
+}
+
 module.exports = function apiV1({
-  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, publicarConfig, jwtSecret,
+  db, deviceState, mqttClient, authenticateToken, requireAdmin, enviarAlimentar, publicarConfig, alertas,
+  jwtSecret,
 }) {
   const router = express.Router();
 
@@ -139,6 +180,55 @@ module.exports = function apiV1({
     res.json(toPecera(row, horarios[row.id]));
   });
 
+  // El dueño cambia el nombre o la especie. La especie es el id de un perfil del frontend.
+  router.patch('/peceras/:id', authenticateToken, async (req, res) => {
+    const row = await peceraPropia(req, res);
+    if (!row) return;
+    const cambios = {};
+    if (req.body?.nombre !== undefined) {
+      const nombre = String(req.body.nombre).trim().replace(/\s+/g, ' ');
+      if (nombre.length < 1 || nombre.length > 60) {
+        return res.status(400).json({ message: 'El nombre tiene que tener entre 1 y 60 caracteres.' });
+      }
+      cambios.nombre = nombre;
+    }
+    if (req.body?.especieId !== undefined) {
+      const especieId = req.body.especieId;
+      if (especieId !== null && !/^[a-z0-9-]{1,64}$/.test(String(especieId))) {
+        return res.status(400).json({ message: 'La especie no es válida.' });
+      }
+      cambios.especieId = especieId;
+    }
+    await db.updateDevice(row.id, cambios);
+    const horarios = await db.listSchedules([row.id]);
+    res.json(toPecera(await db.getDevice(row.id), horarios[row.id]));
+  });
+
+  router.get('/peceras/:id/alertas', authenticateToken, async (req, res) => {
+    const row = await peceraPropia(req, res);
+    if (row) res.json(await db.getAlertConfig(row.id));
+  });
+
+  router.put('/peceras/:id/alertas', authenticateToken, async (req, res) => {
+    const row = await peceraPropia(req, res);
+    if (!row) return;
+    const config = validarConfigAlertas(req.body);
+    if (typeof config === 'string') return res.status(400).json({ message: config });
+    await alertas.configurar(row.id, config);
+    res.json(config);
+  });
+
+  router.get('/alertas', authenticateToken, async (req, res) => {
+    res.json(await db.listAlerts(req.user.id));
+  });
+
+  router.post('/alertas/:id/reconocer', authenticateToken, async (req, res) => {
+    if (!(await db.acknowledgeAlert(req.params.id, req.user.id))) {
+      return res.status(404).json({ message: 'No encontramos esa alerta abierta.' });
+    }
+    res.status(204).end();
+  });
+
   // Reportes: lecturas y alimentaciones de las últimas 24 h, 7 o 30 días.
   // Los rangos de cada especie viven en el frontend, así que los cálculos se hacen allá.
   router.get('/peceras/:id/reportes', authenticateToken, async (req, res) => {
@@ -205,7 +295,7 @@ module.exports = function apiV1({
       dispositivos: dispositivos.length,
       enLinea: dispositivos.filter((d) => d.online).length,
       sinVincular: dispositivos.filter((d) => d.estado === 'unclaimed').length,
-      alertasAbiertas: 0,   // todavía no hay evaluación de alertas
+      alertasAbiertas: await db.countOpenAlerts(),
       servicios: [
         { nombre: 'Backend', estado: 'ok', detalle: 'Express, respondiendo.' },
         { nombre: 'MariaDB', estado: 'ok', detalle: 'Lecturas guardadas cada 5 minutos.' },
@@ -214,6 +304,10 @@ module.exports = function apiV1({
           : { nombre: 'Mosquitto', estado: 'sin-conectar', detalle: 'El backend no llega al broker MQTT.' },
       ],
     });
+  });
+
+  router.get('/admin/alertas', authenticateToken, requireAdmin, async (req, res) => {
+    res.json(await db.listAlerts());
   });
 
   router.get('/admin/usuarios', authenticateToken, requireAdmin, async (req, res) => {

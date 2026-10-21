@@ -3,30 +3,54 @@
     <p class="af-kicker">Avisos</p>
     <h1>Alertas</h1>
     <p>
-      Cuando el backend evalúe los rangos, las alertas de agua van a llegar acá. Estas son de
-      demostración.
+      Avisos de agua fuera de rango y de peceras desconectadas. Los límites se configuran en cada
+      pecera, desde el botón «Alertas».
     </p>
   </header>
 
-  @if (alertas().length === 0) {
+  <h2>Pasando ahora</h2>
+  @if (actuales().length === 0) {
     <div class="af-empty">
-      <h2>No hay alertas</h2>
-      <p>Si una pecera se queda sin conexión o se saltea una toma, lo vas a ver en esta lista.</p>
+      <h3>Todo en orden</h3>
+      <p>Si el agua sale de los límites o una pecera se desconecta, lo vas a ver acá.</p>
     </div>
   } @else {
     <ul class="af-alerts">
-      @for (alerta of alertas(); track alerta.id) {
-        <li>
+      @for (alerta of actuales(); track alerta.id) {
+        <li [class.af-alerts__seen]="alerta.estado === 'reconocida'">
           <div>
             <p class="af-kicker">{{ alerta.nombrePecera }} · {{ etiquetaEstado(alerta.estado) }}</p>
-            <h2>{{ alerta.mensaje }}</h2>
-            <p class="af-tank__when">{{ fechaHora(alerta.abiertaEn) }}</p>
+            <h3>{{ alerta.mensaje }}</h3>
+            <p class="af-tank__when">
+              Desde {{ fechaHora(alerta.abiertaEn) }} ·
+              <a [routerLink]="['/app/dispositivos', alerta.deviceId, 'alertas']">Configurar</a>
+            </p>
           </div>
           @if (alerta.estado === 'abierta') {
             <button type="button" class="af-btn af-btn--ghost" (click)="reconocer(alerta)">
-              Reconocer
+              Marcar como vista
             </button>
           }
+        </li>
+      }
+    </ul>
+  }
+
+  @if (historial().length) {
+    <h2>Resueltas en los últimos 30 días</h2>
+    <ul class="af-alerts af-alerts--history">
+      @for (alerta of historial(); track alerta.id) {
+        <li>
+          <div>
+            <p class="af-kicker">{{ alerta.nombrePecera }} · Resuelta</p>
+            <p>{{ alerta.mensaje }}</p>
+            <p class="af-tank__when">
+              {{ fechaHora(alerta.abiertaEn) }}
+              @if (alerta.cerradaEn) {
+                → {{ fechaHora(alerta.cerradaEn) }}
+              }
+            </p>
+          </div>
         </li>
       }
     </ul>

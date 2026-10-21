@@ -1,5 +1,6 @@
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { RouterLink } from '@angular/router';
 
 import { AUTH_API } from '../../../core/auth/auth-api';
 import { DATOS_API, type AlertaVista } from '../../../shared/data/datos-api';
@@ -7,6 +8,7 @@ import { fechaHora } from '../../../shared/formato';
 
 @Component({
   selector: 'app-alertas',
+  imports: [RouterLink],
   templateUrl: './alertas.html',
 })
 export class Alertas {
@@ -17,6 +19,13 @@ export class Alertas {
 
   protected readonly alertas = signal<AlertaVista[]>([]);
   protected readonly fechaHora = fechaHora;
+  /** Abiertas y reconocidas: siguen pasando. */
+  protected readonly actuales = computed(() =>
+    this.alertas().filter((a) => a.estado !== 'cerrada'),
+  );
+  protected readonly historial = computed(() =>
+    this.alertas().filter((a) => a.estado === 'cerrada'),
+  );
 
   constructor() {
     const id = this.auth.usuario()?.id ?? '';
@@ -26,7 +35,13 @@ export class Alertas {
 
   protected reconocer(alerta: AlertaVista): void {
     this.datos.reconocerAlerta(alerta.id, this.auth.usuario()?.id ?? '').subscribe({
-      next: () => this.snack.open('Alerta reconocida (simulado).', 'Cerrar', { duration: 4000 }),
+      next: () => {
+        // Se marca enseguida; el próximo refresco lo confirma
+        this.alertas.update((lista) =>
+          lista.map((a) => (a.id === alerta.id ? { ...a, estado: 'reconocida' } : a)),
+        );
+        this.snack.open('Alerta reconocida.', 'Cerrar', { duration: 4000 });
+      },
       error: (error: unknown) => {
         const mensaje = error instanceof Error ? error.message : 'No se pudo reconocer la alerta.';
         this.snack.open(mensaje, 'Cerrar', { duration: 4000 });
@@ -39,8 +54,8 @@ export class Alertas {
       return 'Abierta';
     }
     if (estado === 'reconocida') {
-      return 'Reconocida';
+      return 'Vista, sigue pasando';
     }
-    return 'Cerrada';
+    return 'Resuelta';
   }
 }
