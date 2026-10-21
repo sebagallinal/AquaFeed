@@ -7,6 +7,7 @@ import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
+import type { AlimentacionReporte, PeriodoReporte, ReporteDatos } from '../models/reporte.model';
 import type { Usuario } from '../models/usuario.model';
 import {
   DatosApi,
@@ -25,6 +26,16 @@ const API = '/api/v1';
 
 /** El ESP32 publica cada 5 s: las pantallas con lecturas se refrescan al mismo ritmo. */
 const INTERVALO_VIVO_MS = 5000;
+
+/** El backend manda las lecturas como [ts, temp, ph, tds] para achicar la respuesta. */
+interface ReporteBackend {
+  deviceId: string;
+  dias: PeriodoReporte;
+  desde: number;
+  hasta: number;
+  lecturas: [number, number | null, number | null, number | null][];
+  alimentaciones: AlimentacionReporte[];
+}
 
 interface PeceraBackend {
   dispositivo: Dispositivo;
@@ -85,6 +96,24 @@ export class HttpDatosService implements DatosApi {
         catchError((error: unknown) =>
           throwError(() => new PeceraNoDisponibleError(mensajeDe(error))),
         ),
+      );
+  }
+
+  reporte(
+    deviceId: string,
+    _usuarioId: string,
+    dias: PeriodoReporte,
+  ): Observable<ReporteDatos | null> {
+    return this.http
+      .get<ReporteBackend>(`${API}/peceras/${encodeURIComponent(deviceId)}/reportes`, {
+        params: { dias },
+      })
+      .pipe(
+        map((r): ReporteDatos => ({
+          ...r,
+          lecturas: r.lecturas.map(([ts, temp, ph, tds]) => ({ ts, temp, ph, tds })),
+        })),
+        catchError(nullSiNoExiste),
       );
   }
 

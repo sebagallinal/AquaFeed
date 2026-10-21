@@ -20,6 +20,7 @@ export class UserShell {
   private readonly abiertas = signal(0);
   protected readonly items = computed<ItemNav[]>(() => [
     { etiqueta: 'Mis peceras', ruta: '/app', icono: 'water_drop', exacta: true },
+    { etiqueta: 'Reportes', ruta: '/app/reportes', icono: 'bar_chart' },
     { etiqueta: 'Alertas', ruta: '/app/alertas', icono: 'notifications', badge: this.abiertas() },
     { etiqueta: 'Especies', ruta: '/app/especies', icono: 'menu_book' },
   ]);

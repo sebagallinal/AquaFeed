@@ -7,6 +7,7 @@ import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
+import type { PeriodoReporte, ReporteDatos } from '../models/reporte.model';
 import type { Usuario } from '../models/usuario.model';
 
 export interface PeceraResumen {
@@ -72,6 +73,12 @@ export interface DatosApi {
   especies(): Observable<PerfilEspecie[]>;
   especie(slug: string): Observable<PerfilEspecie | null>;
   alimentar(deviceId: string, usuarioId: string, portions: number): Observable<ComandoAlimentacion>;
+  /** Lecturas y alimentaciones del período. null si la pecera no existe o no es del usuario. */
+  reporte(
+    deviceId: string,
+    usuarioId: string,
+    dias: PeriodoReporte,
+  ): Observable<ReporteDatos | null>;
   /** Reemplaza el calendario completo de la pecera. */
   guardarHorarios(
     deviceId: string,

@@ -1,0 +1,268 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <h1>Reportes</h1>
+    <p>
+      Cómo estuvo el agua y cuánto comieron los peces. Las lecturas se guardan cada 5 minutos y se
+      comparan con los rangos de la especie de cada pecera.
+    </p>
+  </header>
+
+  @if (peceras() === undefined) {
+    <p>Cargando peceras…</p>
+  } @else if (seleccionada(); as pecera) {
+    <div class="af-report-filters">
+      <label class="af-field">
+        <span>Pecera</span>
+        <select (change)="elegirPecera($any($event.target).value)">
+          @for (p of peceras(); track p.dispositivo.id) {
+            <option
+              [value]="p.dispositivo.id"
+              [selected]="p.dispositivo.id === pecera.dispositivo.id"
+            >
+              {{ p.dispositivo.nombre }}
+            </option>
+          }
+        </select>
+      </label>
+      <div class="af-segmented" role="group" aria-label="Período">
+        @for (p of periodos; track p.dias) {
+          <button
+            type="button"
+            [attr.aria-pressed]="periodo() === p.dias"
+            (click)="periodo.set(p.dias)"
+          >
+            {{ p.nombre }}
+          </button>
+        }
+      </div>
+      <div class="af-report-filters__csv">
+        <button
+          type="button"
+          class="af-btn af-btn--ghost af-btn--small"
+          [disabled]="!reporte()"
+          (click)="descargar('lecturas')"
+        >
+          Lecturas (CSV)
+        </button>
+        <button
+          type="button"
+          class="af-btn af-btn--ghost af-btn--small"
+          [disabled]="!reporte()"
+          (click)="descargar('alimentaciones')"
+        >
+          Alimentaciones (CSV)
+        </button>
+      </div>
+    </div>
+
+    @if (!especie()) {
+      <p class="af-callout">
+        Esta pecera no tiene especie asignada: los gráficos muestran las lecturas pero no se pueden
+        comparar con un rango ideal.
+      </p>
+    }
+
+    @if (reporte() === undefined) {
+      <p>Cargando reporte…</p>
+    } @else if (reporte() === null) {
+      <div class="af-empty">
+        <h2>No pudimos cargar el reporte</h2>
+        <p>Probá de nuevo en un momento.</p>
+      </div>
+    } @else {
+      <div class="af-report" [class.af-report--loading]="cargando()">
+        <!-- Tiempo en rango -->
+        <section class="af-panel" aria-labelledby="titulo-rango">
+          <h2 id="titulo-rango">Tiempo en rango</h2>
+          @if (especie(); as e) {
+            <p class="af-hint">Comparado con la ficha de {{ e.nombre }}.</p>
+          }
+          <ul class="af-range-list">
+            @for (p of porParametro(); track p.clave) {
+              <li>
+                <div class="af-range-list__head">
+                  <strong>{{ p.nombre }}</strong>
+                  @if (p.tiempo && p.tiempo.total > 0) {
+                    <span class="af-range-list__big">
+                      {{ numero(porcentaje(p.tiempo.ideal, p.tiempo.total), 0) }} %
+                      <small>en rango ideal</small>
+                    </span>
+                  }
+                </div>
+                @if (!p.tiempo) {
+                  <p class="af-hint">La ficha no tiene un rango para comparar.</p>
+                } @else if (p.tiempo.total === 0) {
+                  <p class="af-hint">Sin lecturas en este período.</p>
+                } @else {
+                  <div class="af-stack" aria-hidden="true">
+                    @if (p.tiempo.ideal) {
+                      <span
+                        class="af-stack__seg"
+                        data-estado="ideal"
+                        [style.flex-grow]="p.tiempo.ideal"
+                      ></span>
+                    }
+                    @if (p.tiempo.advertencia) {
+                      <span
+                        class="af-stack__seg"
+                        data-estado="advertencia"
+                        [style.flex-grow]="p.tiempo.advertencia"
+                      ></span>
+                    }
+                    @if (p.tiempo.critico) {
+                      <span
+                        class="af-stack__seg"
+                        data-estado="critico"
+                        [style.flex-grow]="p.tiempo.critico"
+                      ></span>
+                    }
+                    @if (p.tiempo.sinDato) {
+                      <span
+                        class="af-stack__seg"
+                        data-estado="sin-dato"
+                        [style.flex-grow]="p.tiempo.sinDato"
+                      ></span>
+                    }
+                  </div>
+                  <ul class="af-legend af-legend--status">
+                    <li>
+                      <span class="af-swatch" data-estado="ideal"></span>✓ Ideal
+                      <strong>{{ numero(porcentaje(p.tiempo.ideal, p.tiempo.total), 1) }} %</strong>
+                    </li>
+                    <li>
+                      <span class="af-swatch" data-estado="advertencia"></span>! Advertencia
+                      <strong
+                        >{{ numero(porcentaje(p.tiempo.advertencia, p.tiempo.total), 1) }} %</strong
+                      >
+                    </li>
+                    <li>
+                      <span class="af-swatch" data-estado="critico"></span>✕ Crítico
+                      <strong
+                        >{{ numero(porcentaje(p.tiempo.critico, p.tiempo.total), 1) }} %</strong
+                      >
+                    </li>
+                    @if (p.tiempo.sinDato) {
+                      <li>
+                        <span class="af-swatch" data-estado="sin-dato"></span>Sin dato
+                        <strong
+                          >{{ numero(porcentaje(p.tiempo.sinDato, p.tiempo.total), 1) }} %</strong
+                        >
+                      </li>
+                    }
+                  </ul>
+                }
+              </li>
+            }
+          </ul>
+        </section>
+
+        <!-- Un gráfico por parámetro -->
+        @for (p of porParametro(); track p.clave) {
+          <section class="af-panel" [attr.aria-labelledby]="'titulo-' + p.clave">
+            <div class="af-panel__head">
+              <h2 [id]="'titulo-' + p.clave">
+                {{ p.nombre }}{{ p.unidad ? ' (' + p.unidad + ')' : '' }}
+              </h2>
+              @if (p.stats; as s) {
+                <dl class="af-mini-stats">
+                  <div>
+                    <dt>Última</dt>
+                    <dd>{{ numero(s.ultimo, p.decimales) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Promedio</dt>
+                    <dd>{{ numero(s.promedio, p.decimales) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Mínima</dt>
+                    <dd>{{ numero(s.min, p.decimales) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Máxima</dt>
+                    <dd>{{ numero(s.max, p.decimales) }}</dd>
+                  </div>
+                </dl>
+              }
+            </div>
+            <app-grafico-linea
+              [nombre]="p.nombre + ' de ' + pecera.dispositivo.nombre"
+              [puntos]="p.puntos"
+              [desde]="reporte()!.desde"
+              [hasta]="reporte()!.hasta"
+              [rangos]="p.rangos"
+              [unidad]="p.unidad"
+              [decimales]="p.decimales"
+              [textoRango]="p.textoRango"
+            />
+          </section>
+        }
+
+        <!-- Alimentaciones -->
+        <section class="af-panel" aria-labelledby="titulo-alim">
+          <div class="af-panel__head">
+            <h2 id="titulo-alim">Alimentaciones</h2>
+            <a
+              class="af-back"
+              [routerLink]="['/app/dispositivos', pecera.dispositivo.id, 'horarios']"
+            >
+              Editar horarios
+            </a>
+          </div>
+          <dl class="af-mini-stats af-mini-stats--wide">
+            <div>
+              <dt>Tomas</dt>
+              <dd>{{ totales().tomas }}</dd>
+            </div>
+            <div>
+              <dt>Porciones</dt>
+              <dd>{{ totales().porciones }}</dd>
+            </div>
+            <div>
+              <dt>Programadas</dt>
+              <dd>{{ numero(porcentaje(totales().programadas, totales().tomas), 0) }} %</dd>
+            </div>
+            @if (dias().length > 2) {
+              <div>
+                <dt>Días completos sin comer</dt>
+                <dd>{{ totales().diasSinTomas }}</dd>
+              </div>
+            }
+          </dl>
+          <app-grafico-barras [dias]="dias()" />
+          <details class="af-details">
+            <summary>Ver tabla por día</summary>
+            <div class="af-table-wrap">
+              <table class="af-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Día</th>
+                    <th scope="col">Programadas</th>
+                    <th scope="col">Web</th>
+                    <th scope="col">Botón</th>
+                    <th scope="col">Porciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (d of dias(); track d.dia) {
+                    <tr>
+                      <th scope="row">{{ d.etiqueta }}</th>
+                      <td>{{ d.programada }}</td>
+                      <td>{{ d.web }}</td>
+                      <td>{{ d.boton }}</td>
+                      <td>{{ d.porciones }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      </div>
+    }
+  } @else {
+    <div class="af-empty">
+      <h2>Todavía no tenés peceras</h2>
+      <p>Cuando vincules un alimentador vas a ver sus reportes acá.</p>
+    </div>
+  }
+</section>

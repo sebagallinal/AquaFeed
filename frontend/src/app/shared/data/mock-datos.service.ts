@@ -9,6 +9,12 @@ import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
+import type {
+  AlimentacionReporte,
+  LecturaReporte,
+  PeriodoReporte,
+  ReporteDatos,
+} from '../models/reporte.model';
 import type { Usuario } from '../models/usuario.model';
 import {
   DatosApi,
@@ -305,6 +311,17 @@ export class MockDatosService implements DatosApi {
     });
   }
 
+  reporte(
+    deviceId: string,
+    usuarioId: string,
+    dias: PeriodoReporte,
+  ): Observable<ReporteDatos | null> {
+    const dispositivo = DISPOSITIVOS.find(
+      (item) => item.id === deviceId && item.ownerId === usuarioId,
+    );
+    return of(dispositivo ? reporteSimulado(deviceId, dias, this.horariosDe(deviceId)) : null);
+  }
+
   guardarHorarios(
     deviceId: string,
     usuarioId: string,
@@ -441,4 +458,61 @@ export class MockDatosService implements DatosApi {
       especieNombre: especie?.nombre ?? null,
     };
   }
+}
+
+/**
+ * Datos de prueba para la pantalla de reportes: lecturas cada 5 minutos con un ciclo
+ * diario, alguna excursión fuera de rango y un hueco sin datos; tomas según el calendario.
+ * Es determinístico para que la pantalla no cambie en cada recarga.
+ */
+function reporteSimulado(
+  deviceId: string,
+  dias: PeriodoReporte,
+  horarios: Horario[],
+): ReporteDatos {
+  const hasta = Math.floor(Date.now() / 300_000) * 300;
+  const desde = hasta - dias * 86_400;
+  const semilla = [...deviceId].reduce((total, c) => total + c.charCodeAt(0), 0);
+  const ruido = (i: number): number => Math.sin(i * 12.9898 + semilla) * 0.5;
+
+  const lecturas: LecturaReporte[] = [];
+  for (let ts = desde, i = 0; ts <= hasta; ts += 300, i += 1) {
+    const horaDelDia = (((ts / 3600 - 3) % 24) + 24) % 24;
+    const ciclo = Math.sin(((horaDelDia - 9) / 24) * 2 * Math.PI);
+    // Un hueco de 2 horas hace 30 horas (por ejemplo, un corte de luz)
+    const hueco = hasta - ts > 28 * 3600 && hasta - ts < 30 * 3600;
+    // Una tarde calurosa hace 2 días
+    const calor = hasta - ts > 44 * 3600 && hasta - ts < 48 * 3600 ? 4 : 0;
+    lecturas.push({
+      ts,
+      temp: hueco ? null : round(25 + 1.5 * ciclo + calor + ruido(i) * 0.4, 2),
+      ph: hueco ? null : round(7.2 + 0.15 * ciclo + ruido(i + 7) * 0.08, 2),
+      tds: hueco ? null : Math.round(220 + 15 * ciclo + ruido(i + 3) * 10 + (i / 288) * 4),
+    });
+  }
+
+  const alimentaciones: AlimentacionReporte[] = [];
+  for (let ts = desde; ts <= hasta; ts += 60) {
+    const fecha = new Date((ts - 3 * 3600) * 1000);
+    const hora = `${String(fecha.getUTCHours()).padStart(2, '0')}:${String(fecha.getUTCMinutes()).padStart(2, '0')}`;
+    const dia = fecha.getUTCDay() === 0 ? 7 : fecha.getUTCDay();
+    for (const h of horarios) {
+      if (h.enabled && h.time === hora && h.days.includes(dia)) {
+        alimentaciones.push({ ts, origen: 'programada', porciones: h.portions });
+      }
+    }
+    if (
+      fecha.getUTCHours() === 13 &&
+      fecha.getUTCMinutes() === 15 &&
+      fecha.getUTCDate() % 3 === 0
+    ) {
+      alimentaciones.push({ ts, origen: 'web', porciones: 1 });
+    }
+  }
+  return { deviceId, dias, desde, hasta, lecturas, alimentaciones };
+}
+
+function round(valor: number, decimales: number): number {
+  const factor = 10 ** decimales;
+  return Math.round(valor * factor) / factor;
 }

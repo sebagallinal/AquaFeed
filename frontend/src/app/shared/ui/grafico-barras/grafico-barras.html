@@ -1,0 +1,95 @@
+<ul class="af-legend" aria-label="Origen de la toma">
+  @for (o of origenes; track o.clave) {
+    <li><span class="af-swatch" [attr.data-origen]="o.clave"></span>{{ o.nombre }}</li>
+  }
+</ul>
+
+<div class="af-chart__plot">
+  <svg
+    [attr.width]="ancho()"
+    [attr.height]="alto"
+    [attr.viewBox]="'0 0 ' + ancho() + ' ' + alto"
+    role="img"
+    tabindex="0"
+    aria-label="Tomas por día. Usá las flechas para recorrer los días. El detalle está en la tabla."
+    (pointerleave)="activo.set(null)"
+    (focus)="enfocar()"
+    (blur)="activo.set(null)"
+    (keydown)="teclado($event)"
+  >
+    @for (v of escala().ticks; track v) {
+      <line
+        class="af-chart__grid"
+        [attr.x1]="m.izquierda"
+        [attr.x2]="ancho() - m.derecha"
+        [attr.y1]="y(v)"
+        [attr.y2]="y(v)"
+      />
+      <text class="af-chart__tick" [attr.x]="m.izquierda - 6" [attr.y]="y(v) + 4" text-anchor="end">
+        {{ v }}
+      </text>
+    }
+
+    @for (col of columnas(); track col.dia.dia; let i = $index) {
+      <g [class.af-chart__col--on]="activo() === i">
+        @for (s of col.segmentos; track s.origen) {
+          <path class="af-chart__bar" [attr.data-origen]="s.origen" [attr.d]="s.d" />
+        }
+        @if (i % cadaCuanto() === 0) {
+          <text
+            class="af-chart__tick"
+            [attr.x]="col.centro"
+            [attr.y]="alto - 8"
+            text-anchor="middle"
+          >
+            {{ col.dia.etiqueta }}
+          </text>
+        }
+        <!-- Zona de hover: toda la franja del día, más grande que la barra -->
+        <rect
+          class="af-chart__hit"
+          [attr.x]="col.centro - banda() / 2"
+          [attr.y]="m.arriba"
+          [attr.width]="banda()"
+          [attr.height]="alto - m.arriba - m.abajo"
+          (pointerenter)="activo.set(i)"
+        />
+      </g>
+    }
+
+    <line
+      class="af-chart__axis"
+      [attr.x1]="m.izquierda"
+      [attr.x2]="ancho() - m.derecha"
+      [attr.y1]="y(0)"
+      [attr.y2]="y(0)"
+    />
+  </svg>
+
+  @if (detalle(); as d) {
+    <div
+      class="af-tooltip"
+      [style.left.px]="d.izquierda ? null : d.col.centro + 16"
+      [style.right.px]="d.izquierda ? ancho() - d.col.centro + 16 : null"
+      [style.top.px]="m.arriba"
+      aria-hidden="true"
+    >
+      <strong>{{ d.col.dia.tomas }} {{ d.col.dia.tomas === 1 ? 'toma' : 'tomas' }}</strong>
+      <span>{{ d.col.dia.etiqueta }} · {{ d.col.dia.porciones }} porciones</span>
+      @for (o of origenes; track o.clave) {
+        @if (d.col.dia[o.clave] > 0) {
+          <span class="af-tooltip__row">
+            <span class="af-swatch af-swatch--line" [attr.data-origen]="o.clave"></span>
+            <strong>{{ d.col.dia[o.clave] }}</strong
+            >&nbsp;{{ o.nombre }}
+          </span>
+        }
+      }
+    </div>
+  }
+  <p class="af-sr" aria-live="polite">
+    @if (detalle(); as d) {
+      {{ d.col.dia.etiqueta }}: {{ d.col.dia.tomas }} tomas, {{ d.col.dia.porciones }} porciones
+    }
+  </p>
+</div>

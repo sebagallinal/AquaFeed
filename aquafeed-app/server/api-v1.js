@@ -139,6 +139,27 @@ module.exports = function apiV1({
     res.json(toPecera(row, horarios[row.id]));
   });
 
+  // Reportes: lecturas y alimentaciones de las últimas 24 h, 7 o 30 días.
+  // Los rangos de cada especie viven en el frontend, así que los cálculos se hacen allá.
+  router.get('/peceras/:id/reportes', authenticateToken, async (req, res) => {
+    const row = await peceraPropia(req, res);
+    if (!row) return;
+    const dias = Number(req.query.dias);
+    if (![1, 7, 30].includes(dias)) {
+      return res.status(400).json({ message: 'El período tiene que ser 1, 7 o 30 días.' });
+    }
+    const hasta = new Date();
+    const desde = new Date(hasta.getTime() - dias * 24 * 3600 * 1000);
+    const datos = await db.getReport(row.id, desde, hasta);
+    res.json({
+      deviceId: row.id,
+      dias,
+      desde: Math.floor(desde.getTime() / 1000),
+      hasta: Math.floor(hasta.getTime() / 1000),
+      ...datos,
+    });
+  });
+
   // Reemplaza el calendario completo de la pecera y se lo manda al ESP32.
   // Si el dispositivo está apagado lo recibe al reconectarse (el mensaje queda retenido).
   router.put('/peceras/:id/horarios', authenticateToken, async (req, res) => {

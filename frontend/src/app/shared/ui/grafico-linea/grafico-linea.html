@@ -1,0 +1,120 @@
+<div class="af-chart__plot">
+  <svg
+    [attr.width]="ancho()"
+    [attr.height]="alto"
+    [attr.viewBox]="'0 0 ' + ancho() + ' ' + alto"
+    role="img"
+    tabindex="0"
+    [attr.aria-label]="
+      nombre() + '. Usá las flechas para recorrer las lecturas. El detalle está en el CSV.'
+    "
+    (pointermove)="mover($event)"
+    (pointerleave)="activo.set(null)"
+    (focus)="enfocar()"
+    (blur)="activo.set(null)"
+    (keydown)="teclado($event)"
+  >
+    <!-- Grilla y eje Y -->
+    @for (v of escalaY().ticks; track v) {
+      <line
+        class="af-chart__grid"
+        [attr.x1]="m.izquierda"
+        [attr.x2]="ancho() - m.derecha"
+        [attr.y1]="y(v)"
+        [attr.y2]="y(v)"
+      />
+      <text class="af-chart__tick" [attr.x]="m.izquierda - 6" [attr.y]="y(v) + 4" text-anchor="end">
+        {{ formato(v) }}
+      </text>
+    }
+
+    <!-- Rango ideal de la especie -->
+    @if (banda(); as b) {
+      <rect
+        class="af-chart__band"
+        [attr.x]="m.izquierda"
+        [attr.y]="b.y"
+        [attr.width]="ancho() - m.izquierda - m.derecha"
+        [attr.height]="b.alto"
+      />
+    }
+    @for (yc of lineasCriticas(); track yc) {
+      <line
+        class="af-chart__critical"
+        [attr.x1]="m.izquierda"
+        [attr.x2]="ancho() - m.derecha"
+        [attr.y1]="yc"
+        [attr.y2]="yc"
+      />
+    }
+
+    <!-- Eje X -->
+    <line
+      class="af-chart__axis"
+      [attr.x1]="m.izquierda"
+      [attr.x2]="ancho() - m.derecha"
+      [attr.y1]="alto - m.abajo"
+      [attr.y2]="alto - m.abajo"
+    />
+    @for (tick of ticksX(); track tick.t) {
+      <text class="af-chart__tick" [attr.x]="x(tick.t)" [attr.y]="alto - 8" text-anchor="middle">
+        {{ tick.etiqueta }}
+      </text>
+    }
+
+    <path class="af-chart__line" [attr.d]="path()" />
+
+    @if (punto(); as p) {
+      <line
+        class="af-chart__cross"
+        [attr.x1]="p.x"
+        [attr.x2]="p.x"
+        [attr.y1]="m.arriba"
+        [attr.y2]="alto - m.abajo"
+      />
+      @if (p.y !== null) {
+        <circle class="af-chart__dot" [attr.cx]="p.x" [attr.cy]="p.y" r="4.5" />
+      }
+    }
+
+    @if (sinDatos()) {
+      <text class="af-chart__empty" [attr.x]="ancho() / 2" [attr.y]="alto / 2" text-anchor="middle">
+        Sin lecturas en este período
+      </text>
+    }
+  </svg>
+
+  @if (punto(); as p) {
+    <div
+      class="af-tooltip"
+      [style.left.px]="p.izquierda ? null : p.x + 12"
+      [style.right.px]="p.izquierda ? ancho() - p.x + 12 : null"
+      [style.top.px]="m.arriba"
+      aria-hidden="true"
+    >
+      <strong>{{ p.valor }}</strong>
+      <span>{{ p.fecha }}</span>
+    </div>
+  }
+  <p class="af-sr" aria-live="polite">
+    @if (punto(); as p) {
+      {{ p.valor }}, {{ p.fecha }}
+    }
+  </p>
+</div>
+
+<!-- Solo se nombra lo que quedó dibujado dentro de la escala -->
+@if (banda() || lineasCriticas().length) {
+  <ul class="af-legend">
+    @if (banda()) {
+      <li>
+        <span class="af-swatch af-swatch--band"></span>Rango ideal{{
+          textoRango() ? ' (' + textoRango() + ')' : ''
+        }}
+      </li>
+    }
+    @if (lineasCriticas().length) {
+      <li><span class="af-swatch af-swatch--critical"></span>Límite crítico</li>
+    }
+  </ul>
+}

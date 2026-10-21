@@ -220,6 +220,31 @@ async function getFeedings(deviceId, limit) {
   return rows;
 }
 
+// Datos crudos de un período para los reportes del frontend. Las lecturas van como
+// [ts, temp, ph, tds] (ts en segundos) para que 30 días entren en pocos cientos de KB.
+async function getReport(deviceId, desde, hasta) {
+  const [lecturas] = await pool.query(
+    `SELECT registrado_en, temp_agua, ph, tds_ppm
+       FROM lecturas_agua WHERE dispositivo_id = ? AND registrado_en BETWEEN ? AND ?
+      ORDER BY registrado_en`,
+    [deviceId, desde, hasta]
+  );
+  const [alimentaciones] = await pool.query(
+    `SELECT registrado_en, origen, porciones
+       FROM alimentaciones WHERE dispositivo_id = ? AND registrado_en BETWEEN ? AND ?
+      ORDER BY registrado_en`,
+    [deviceId, desde, hasta]
+  );
+  // registrado_en se guarda en UTC y el pool lo lee como UTC (timezone: 'Z')
+  const seg = (fecha) => Math.floor(fecha.getTime() / 1000);
+  return {
+    lecturas: lecturas.map((r) => [seg(r.registrado_en), r.temp_agua, r.ph, r.tds_ppm]),
+    alimentaciones: alimentaciones.map((r) => ({
+      ts: seg(r.registrado_en), origen: r.origen, porciones: r.porciones,
+    })),
+  };
+}
+
 // Última lectura de cada tipo por dispositivo, para no arrancar con el dashboard vacío
 async function getLatestState() {
   const state = {};
@@ -251,5 +276,5 @@ module.exports = {
   pool, init, toApiUser, findUserByLogin, listUsers, countUsers,
   toUsuario, listUsuarios, findUserById, listDevices, getDevice,
   saveReading, saveFeeding, getHistory, getFeedings, getLatestState,
-  listSchedules, replaceSchedules,
+  listSchedules, replaceSchedules, getReport,
 };

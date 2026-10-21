@@ -55,6 +55,13 @@
       >
         Ver horarios
       </a>
+      <a
+        class="af-btn af-btn--ghost"
+        routerLink="/app/reportes"
+        [queryParams]="{ pecera: pecera.dispositivo.id }"
+      >
+        Ver reportes
+      </a>
       @if (pecera.especie) {
         <a class="af-btn af-btn--ghost" [routerLink]="['/app/especies', pecera.especie.slug]">
           Guía de {{ pecera.especie.nombre }}

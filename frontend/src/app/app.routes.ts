@@ -40,6 +40,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/usuario/horarios/horarios').then((m) => m.Horarios),
       },
       {
+        path: 'reportes',
+        data: { titulo: 'Reportes' },
+        loadComponent: () => import('./features/usuario/reportes/reportes').then((m) => m.Reportes),
+      },
+      {
         path: 'alertas',
         data: { titulo: 'Alertas' },
         loadComponent: () => import('./features/usuario/alertas/alertas').then((m) => m.Alertas),
