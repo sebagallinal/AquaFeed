@@ -29,6 +29,10 @@ export interface ConfigAlertas {
   tdsMin: number | null;
   tdsMax: number | null;
   offlineMin: number | null;
+  /** true: los límites de ese sensor siguen el rango ideal de la especie de la pecera. */
+  tempEspecie: boolean;
+  phEspecie: boolean;
+  tdsEspecie: boolean;
 }
 
 export const CONFIG_ALERTAS_DEFECTO: ConfigAlertas = {
@@ -39,4 +43,7 @@ export const CONFIG_ALERTAS_DEFECTO: ConfigAlertas = {
   tdsMin: null,
   tdsMax: null,
   offlineMin: 10,
+  tempEspecie: false,
+  phEspecie: false,
+  tdsEspecie: false,
 };

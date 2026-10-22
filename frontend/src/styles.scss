@@ -2003,3 +2003,35 @@ h2 .af-badge {
 .af-credits-link a {
   color: var(--af-muted);
 }
+
+.af-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.af-mode__opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.af-mode__opt input {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--af-deep-2);
+  flex: none;
+}
+
+.af-mode__opt small {
+  display: block;
+  color: var(--af-muted);
+  font-size: 0.78rem;
+}
+
+.af-mode__opt--off {
+  color: var(--af-muted);
+}

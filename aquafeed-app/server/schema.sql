@@ -111,3 +111,9 @@ CREATE TABLE IF NOT EXISTS alertas (
   INDEX idx_alertas_disp_estado (dispositivo_id, estado),
   CONSTRAINT fk_alertas_disp FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 1 = los límites de ese sensor siguen el rango ideal de la especie: cuando el dueño cambia
+-- de especie, la web recalcula los límites. 0 = límites puestos a mano.
+ALTER TABLE config_alertas ADD COLUMN IF NOT EXISTS temp_especie TINYINT(1) NOT NULL DEFAULT 0 AFTER temp_max;
+ALTER TABLE config_alertas ADD COLUMN IF NOT EXISTS ph_especie TINYINT(1) NOT NULL DEFAULT 0 AFTER ph_max;
+ALTER TABLE config_alertas ADD COLUMN IF NOT EXISTS tds_especie TINYINT(1) NOT NULL DEFAULT 0 AFTER tds_max;

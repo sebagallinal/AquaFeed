@@ -4,15 +4,16 @@ import { RouterLink } from '@angular/router';
 import { AUTH_API } from '../../../core/auth/auth-api';
 import { DATOS_API, type PeceraDetalle } from '../../../shared/data/datos-api';
 import { CONFIG_ALERTAS_DEFECTO, type ConfigAlertas } from '../../../shared/models/alerta.model';
-import { rangosDe, type Parametro } from '../../../shared/reportes';
+import { CLAVES_SENSOR, rangoIdeal } from '../../../shared/alertas';
+import type { Parametro } from '../../../shared/reportes';
 
 interface Sensor {
   clave: Parametro;
   nombre: string;
   unidad: string;
   paso: number;
-  min: keyof ConfigAlertas;
-  max: keyof ConfigAlertas;
+  min: 'tempMin' | 'phMin' | 'tdsMin';
+  max: 'tempMax' | 'phMax' | 'tdsMax';
   lectura: 'waterTempC' | 'ph' | 'tdsPpm';
   decimales: number;
 }
@@ -55,6 +56,8 @@ const MINUTOS_DESCONEXION = [5, 10, 15, 30, 60, 120];
 /** Lo que se está editando de un sensor: los campos quedan como texto mientras se tipea. */
 interface Fila {
   activo: boolean;
+  /** true: usa el rango ideal de la especie y lo sigue si se cambia de especie. */
+  especie: boolean;
   min: string;
   max: string;
 }
@@ -75,9 +78,9 @@ export class AlertasPecera {
   protected readonly detalle = signal<PeceraDetalle | null | undefined>(undefined);
   protected readonly cargada = signal(false);
   protected readonly filas = signal<Record<Parametro, Fila>>({
-    temp: { activo: false, min: '', max: '' },
-    ph: { activo: false, min: '', max: '' },
-    tds: { activo: false, min: '', max: '' },
+    temp: { activo: false, especie: false, min: '', max: '' },
+    ph: { activo: false, especie: false, min: '', max: '' },
+    tds: { activo: false, especie: false, min: '', max: '' },
   });
   protected readonly offlineActivo = signal(true);
   protected readonly offlineMin = signal(10);
@@ -92,6 +95,15 @@ export class AlertasPecera {
     for (const s of SENSORES) {
       const fila = this.filas()[s.clave];
       if (!fila.activo) {
+        continue;
+      }
+      if (fila.especie) {
+        if (!this.rangoEspecie(s.clave)) {
+          const e = this.especie();
+          return e
+            ? `${s.nombre}: la ficha de ${e.nombre} no trae un rango. Elegí «Personalizado».`
+            : `${s.nombre}: la pecera no tiene especie. Elegí «Personalizado».`;
+        }
         continue;
       }
       const min = aNumero(fila.min);
@@ -142,23 +154,33 @@ export class AlertasPecera {
 
   /** Rango ideal de la ficha de la especie, si la ficha lo trae. */
   protected rangoEspecie(clave: Parametro): { min: number | null; max: number | null } | null {
-    const rangos = rangosDe(this.especie(), clave);
-    if (!rangos) {
-      return null;
-    }
-    const { min, max } = rangos.ideal.intervalo;
-    return min === null && max === null ? null : { min, max };
+    return rangoIdeal(this.especie(), clave);
   }
 
-  protected usarRangoEspecie(clave: Parametro): void {
+  /** Al pasar a «Personalizado» sin números cargados, se parte del rango de la especie. */
+  protected elegirModo(clave: Parametro, especie: boolean): void {
     const rango = this.rangoEspecie(clave);
-    if (rango) {
-      this.cambiar(clave, {
-        activo: true,
-        min: rango.min === null ? '' : aTexto(rango.min),
-        max: rango.max === null ? '' : aTexto(rango.max),
-      });
-    }
+    const fila = this.fila(clave);
+    const vacio = fila.min.trim() === '' && fila.max.trim() === '';
+    this.cambiar(clave, {
+      especie,
+      ...(!especie && vacio && rango
+        ? {
+            min: rango.min === null ? '' : aTexto(rango.min),
+            max: rango.max === null ? '' : aTexto(rango.max),
+          }
+        : {}),
+    });
+  }
+
+  /** Un sensor que se activa sin límites arranca siguiendo a la especie, si la ficha trae rango. */
+  protected activar(clave: Parametro, activo: boolean): void {
+    const fila = this.fila(clave);
+    const nuevo = activo && !fila.especie && fila.min === '' && fila.max === '';
+    this.cambiar(clave, {
+      activo,
+      ...(nuevo && this.rangoEspecie(clave) ? { especie: true } : {}),
+    });
   }
 
   protected textoRango(clave: Parametro, unidad: string): string {
@@ -203,8 +225,13 @@ export class AlertasPecera {
     const config: ConfigAlertas = { ...CONFIG_ALERTAS_DEFECTO };
     for (const s of SENSORES) {
       const fila = this.filas()[s.clave];
-      config[s.min] = fila.activo ? (aNumero(fila.min) ?? null) : null;
-      config[s.max] = fila.activo ? (aNumero(fila.max) ?? null) : null;
+      const sigue = fila.activo && fila.especie;
+      const rango = sigue ? this.rangoEspecie(s.clave) : null;
+      const valor = (texto: string, deEspecie: number | null | undefined): number | null =>
+        !fila.activo ? null : sigue ? (deEspecie ?? null) : (aNumero(texto) ?? null);
+      config[s.min] = valor(fila.min, rango?.min);
+      config[s.max] = valor(fila.max, rango?.max);
+      config[CLAVES_SENSOR[s.clave].especie] = sigue;
     }
     config.offlineMin = this.offlineActivo() ? this.offlineMin() : null;
 
@@ -230,15 +257,16 @@ export class AlertasPecera {
   }
 
   private cargar(config: ConfigAlertas): void {
-    const fila = (min: number | null, max: number | null): Fila => ({
-      activo: min !== null || max !== null,
+    const fila = (min: number | null, max: number | null, especie: boolean): Fila => ({
+      activo: especie || min !== null || max !== null,
+      especie,
       min: min === null ? '' : aTexto(min),
       max: max === null ? '' : aTexto(max),
     });
     this.filas.set({
-      temp: fila(config.tempMin, config.tempMax),
-      ph: fila(config.phMin, config.phMax),
-      tds: fila(config.tdsMin, config.tdsMax),
+      temp: fila(config.tempMin, config.tempMax, config.tempEspecie),
+      ph: fila(config.phMin, config.phMax, config.phEspecie),
+      tds: fila(config.tdsMin, config.tdsMax, config.tdsEspecie),
     });
     this.offlineActivo.set(config.offlineMin !== null);
     this.offlineMin.set(config.offlineMin ?? 10);

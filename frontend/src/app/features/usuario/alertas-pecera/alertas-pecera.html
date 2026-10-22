@@ -22,7 +22,7 @@
               <input
                 type="checkbox"
                 [checked]="fila(s.clave).activo"
-                (change)="cambiar(s.clave, { activo: $any($event.target).checked })"
+                (change)="activar(s.clave, $any($event.target).checked)"
               />
               <strong>{{ s.nombre }}</strong>
             </label>
@@ -31,36 +31,66 @@
             }
           </div>
 
-          <div class="af-alert-row__limits">
-            <label class="af-field">
-              <span>Avisar si baja de</span>
-              <input
-                type="text"
-                inputmode="decimal"
-                [placeholder]="'Sin mínimo'"
-                [disabled]="!fila(s.clave).activo"
-                [value]="fila(s.clave).min"
-                (input)="cambiar(s.clave, { min: $any($event.target).value })"
-              />
-            </label>
-            <label class="af-field">
-              <span>Avisar si sube de</span>
-              <input
-                type="text"
-                inputmode="decimal"
-                [placeholder]="'Sin máximo'"
-                [disabled]="!fila(s.clave).activo"
-                [value]="fila(s.clave).max"
-                (input)="cambiar(s.clave, { max: $any($event.target).value })"
-              />
-            </label>
-            <span class="af-alert-row__unit">{{ s.unidad }}</span>
-          </div>
+          @if (fila(s.clave).activo) {
+            <div class="af-mode" role="radiogroup" [attr.aria-label]="'Límites de ' + s.nombre">
+              <label class="af-mode__opt" [class.af-mode__opt--off]="!rangoEspecie(s.clave)">
+                <input
+                  type="radio"
+                  [name]="'modo-' + s.clave"
+                  [checked]="fila(s.clave).especie"
+                  [disabled]="!rangoEspecie(s.clave) && !fila(s.clave).especie"
+                  (change)="elegirModo(s.clave, true)"
+                />
+                <span>
+                  @if (especie(); as e) {
+                    @if (rangoEspecie(s.clave)) {
+                      Rango ideal de {{ e.nombre }}:
+                      <strong>{{ textoRango(s.clave, s.unidad) }}</strong>
+                    } @else {
+                      La ficha de {{ e.nombre }} no trae rango
+                    }
+                  } @else {
+                    Rango de la especie (la pecera no tiene especie)
+                  }
+                  <small>Se actualiza solo cuando cambiás la especie.</small>
+                </span>
+              </label>
+              <label class="af-mode__opt">
+                <input
+                  type="radio"
+                  [name]="'modo-' + s.clave"
+                  [checked]="!fila(s.clave).especie"
+                  (change)="elegirModo(s.clave, false)"
+                />
+                <span>Personalizado</span>
+              </label>
+            </div>
+          }
 
-          @if (rangoEspecie(s.clave) && especie(); as e) {
-            <button type="button" class="af-link-btn" (click)="usarRangoEspecie(s.clave)">
-              Usar el rango ideal de {{ e.nombre }} ({{ textoRango(s.clave, s.unidad) }})
-            </button>
+          @if (fila(s.clave).activo && !fila(s.clave).especie) {
+            <div class="af-alert-row__limits">
+              <label class="af-field">
+                <span>Avisar si baja de</span>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  [placeholder]="'Sin mínimo'"
+                  [value]="fila(s.clave).min"
+                  (input)="cambiar(s.clave, { min: $any($event.target).value })"
+                />
+              </label>
+              <label class="af-field">
+                <span>Avisar si sube de</span>
+                <input
+                  type="text"
+                  inputmode="decimal"
+                  [placeholder]="'Sin máximo'"
+                  [value]="fila(s.clave).max"
+                  (input)="cambiar(s.clave, { max: $any($event.target).value })"
+                />
+              </label>
+              <span class="af-alert-row__unit">{{ s.unidad }}</span>
+            </div>
           }
         </fieldset>
       }

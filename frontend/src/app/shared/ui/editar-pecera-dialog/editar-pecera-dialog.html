@@ -25,8 +25,8 @@
 
     <p class="af-hint">
       @if (elegida(); as e) {
-        Los reportes y la sugerencia de horarios van a usar los rangos de {{ e.nombre }}. Las
-        alertas no cambian solas: revisalas en «Alertas» de esta pecera.
+        Los reportes, la sugerencia de horarios y las alertas que siguen a la especie van a usar los
+        rangos de {{ e.nombre }}. Las alertas con límites personalizados no cambian.
       } @else {
         Sin especie no hay rangos para comparar las lecturas.
       }

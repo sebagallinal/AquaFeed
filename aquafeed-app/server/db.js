@@ -260,6 +260,7 @@ async function updateDevice(id, { nombre, especieId }) {
 // Sin fila guardada: solo avisa si se desconecta más de 10 minutos
 const CONFIG_ALERTAS_DEFECTO = {
   tempMin: null, tempMax: null, phMin: null, phMax: null, tdsMin: null, tdsMax: null, offlineMin: 10,
+  tempEspecie: false, phEspecie: false, tdsEspecie: false,
 };
 
 const toConfigAlertas = (r) => ({
@@ -267,6 +268,7 @@ const toConfigAlertas = (r) => ({
   phMin: r.ph_min, phMax: r.ph_max,
   tdsMin: r.tds_min, tdsMax: r.tds_max,
   offlineMin: r.offline_min,
+  tempEspecie: !!r.temp_especie, phEspecie: !!r.ph_especie, tdsEspecie: !!r.tds_especie,
 });
 
 // { [deviceId]: config } con la configuración guardada de cada dispositivo
@@ -282,12 +284,15 @@ async function getAlertConfig(deviceId) {
 
 async function saveAlertConfig(deviceId, c) {
   await pool.query(
-    `INSERT INTO config_alertas (dispositivo_id, temp_min, temp_max, ph_min, ph_max, tds_min, tds_max, offline_min)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO config_alertas (dispositivo_id, temp_min, temp_max, ph_min, ph_max, tds_min, tds_max,
+       offline_min, temp_especie, ph_especie, tds_especie)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE temp_min = VALUES(temp_min), temp_max = VALUES(temp_max),
        ph_min = VALUES(ph_min), ph_max = VALUES(ph_max), tds_min = VALUES(tds_min),
-       tds_max = VALUES(tds_max), offline_min = VALUES(offline_min)`,
-    [deviceId, c.tempMin, c.tempMax, c.phMin, c.phMax, c.tdsMin, c.tdsMax, c.offlineMin]
+       tds_max = VALUES(tds_max), offline_min = VALUES(offline_min),
+       temp_especie = VALUES(temp_especie), ph_especie = VALUES(ph_especie), tds_especie = VALUES(tds_especie)`,
+    [deviceId, c.tempMin, c.tempMax, c.phMin, c.phMax, c.tdsMin, c.tdsMax, c.offlineMin,
+      c.tempEspecie ? 1 : 0, c.phEspecie ? 1 : 0, c.tdsEspecie ? 1 : 0]
   );
 }
 

@@ -3,11 +3,14 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
+import { map, of, switchMap } from 'rxjs';
 
 import { AUTH_API } from '../../../core/auth/auth-api';
+import { aplicarEspecie, listaSensores } from '../../../shared/alertas';
 import { DATOS_API, type CambiosPecera, type PeceraDetalle } from '../../../shared/data/datos-api';
 import { ESPECIES } from '../../../shared/data/especies.mock';
 import { haceCuanto, textoPh, textoPorciones, textoTds, textoTemp } from '../../../shared/formato';
+import type { PerfilEspecie } from '../../../shared/models/perfil-especie.model';
 import {
   AlimentarDialog,
   type AlimentarDialogData,
@@ -61,13 +64,18 @@ export class Pecera {
       if (!cambios) {
         return;
       }
+      const cambioEspecie = cambios.especieId !== pecera.dispositivo.speciesProfileId;
       this.datos
         .editarPecera(pecera.dispositivo.id, this.auth.usuario()?.id ?? '', cambios)
         .subscribe({
           next: (actualizada) => {
             // Se ve el cambio enseguida, sin esperar el próximo refresco
             this.detalle.update((d) => (d ? { ...d, ...actualizada } : d));
-            this.snack.open('Cambios guardados.', 'Cerrar', { duration: 4000 });
+            if (cambioEspecie) {
+              this.seguirEspecie(pecera.dispositivo.id, actualizada.especie);
+            } else {
+              this.snack.open('Cambios guardados.', 'Cerrar', { duration: 4000 });
+            }
           },
           error: (error: unknown) => {
             const mensaje =
@@ -76,6 +84,44 @@ export class Pecera {
           },
         });
     });
+  }
+
+  /** Las alertas que siguen a la especie toman el rango ideal de la especie nueva. */
+  private seguirEspecie(deviceId: string, especie: PerfilEspecie | null): void {
+    const usuarioId = this.auth.usuario()?.id ?? '';
+    const aviso = (texto: string): void => {
+      this.snack.open(texto, 'Cerrar', { duration: 7000 });
+    };
+    this.datos
+      .configAlertas(deviceId, usuarioId)
+      .pipe(
+        switchMap((config) => {
+          const resultado = aplicarEspecie(config, especie);
+          const hayCambios = resultado.actualizados.length || resultado.sinRango.length;
+          return hayCambios
+            ? this.datos
+                .guardarConfigAlertas(deviceId, usuarioId, resultado.config)
+                .pipe(map(() => resultado))
+            : of(resultado);
+        }),
+      )
+      .subscribe({
+        next: ({ actualizados, sinRango }) => {
+          const partes = ['Cambios guardados.'];
+          if (actualizados.length && especie) {
+            partes.push(
+              `Alertas de ${listaSensores(actualizados)} actualizadas al rango de ${especie.nombre}.`,
+            );
+          }
+          if (sinRango.length) {
+            partes.push(
+              `La nueva especie no trae rango de ${listaSensores(sinRango)}: esa alerta queda sin controlar.`,
+            );
+          }
+          aviso(partes.join(' '));
+        },
+        error: () => aviso('Cambios guardados, pero no se pudieron actualizar las alertas.'),
+      });
   }
 
   protected pedir(pecera: PeceraDetalle): void {

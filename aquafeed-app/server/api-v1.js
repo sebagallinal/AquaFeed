@@ -64,6 +64,7 @@ function validarConfigAlertas(body) {
       }
       config[`${clave}${lado}`] = Math.round(valor * 100) / 100;
     }
+    config[`${clave}Especie`] = body?.[`${clave}Especie`] === true;
     const min = config[`${clave}Min`];
     const max = config[`${clave}Max`];
     if (min !== null && max !== null && min >= max) {
