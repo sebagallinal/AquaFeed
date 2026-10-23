@@ -15,7 +15,7 @@ import type {
   PeriodoReporte,
   ReporteDatos,
 } from '../models/reporte.model';
-import type { Usuario } from '../models/usuario.model';
+import type { CambiosUsuario, NuevoUsuario, Usuario } from '../models/usuario.model';
 import {
   DatosApi,
   PeceraNoDisponibleError,
@@ -24,6 +24,7 @@ import {
   type ComandoAlimentacion,
   type DispositivoAdmin,
   type HorariosGuardados,
+  type NuevoDispositivo,
   type PeceraDetalle,
   type PeceraResumen,
   type ResumenAdmin,
@@ -33,7 +34,8 @@ import { ESPECIES } from './especies.mock';
 const MAX_PORCIONES = 5;
 const ZONA = 'America/Argentina/Buenos_Aires';
 
-const USUARIOS: readonly Usuario[] = [
+/** Mutable: el admin crea y edita cuentas en memoria. */
+const USUARIOS: Usuario[] = [
   {
     id: 'usr-admin',
     nombre: 'Equipo AquaFeed',
@@ -64,7 +66,8 @@ const USUARIOS: readonly Usuario[] = [
   },
 ];
 
-const DISPOSITIVOS: readonly Dispositivo[] = [
+/** Mutable: el admin registra placas y cambia dueños en memoria. */
+const DISPOSITIVOS: Dispositivo[] = [
   {
     id: 'af-a1b2c3d4e5f6',
     nombre: 'Living',
@@ -228,8 +231,17 @@ export class MockDatosService implements DatosApi {
   /** Nombre y especie que cambió el dueño, por pecera. */
   private readonly ediciones = signal(new Map<string, CambiosPecera>());
   private readonly configs = new Map<string, ConfigAlertas>();
+  /** Sube cada vez que el admin cambia usuarios o dispositivos. */
+  private readonly versionAdmin = signal(0);
+  private readonly admin$ = toObservable(this.versionAdmin, { injector: this.injector });
   private readonly cambios$ = toObservable(
-    computed(() => [this.alertas(), this.horarios(), this.versiones(), this.ediciones()]),
+    computed(() => [
+      this.alertas(),
+      this.horarios(),
+      this.versiones(),
+      this.ediciones(),
+      this.versionAdmin(),
+    ]),
     { injector: this.injector },
   );
 
@@ -419,20 +431,108 @@ export class MockDatosService implements DatosApi {
   }
 
   usuarios(): Observable<Usuario[]> {
-    return of([...USUARIOS]);
+    return this.admin$.pipe(map(() => USUARIOS.map((u) => ({ ...u }))));
   }
 
   usuario(id: string): Observable<Usuario | null> {
-    return of(USUARIOS.find((item) => item.id === id) ?? null);
+    return this.admin$.pipe(
+      map(() => {
+        const u = USUARIOS.find((item) => item.id === id);
+        return u ? { ...u } : null;
+      }),
+    );
+  }
+
+  crearUsuario(datos: NuevoUsuario): Observable<Usuario> {
+    const email = datos.email.trim().toLowerCase();
+    if (USUARIOS.some((u) => u.email === email)) {
+      return throwError(() => new PeceraNoDisponibleError('Ya hay una cuenta con ese correo.'));
+    }
+    const usuario: Usuario = {
+      id: `usr-${Date.now()}`,
+      nombre: datos.nombre.trim(),
+      email,
+      rol: datos.rol,
+      activo: true,
+      username: email.split('@')[0],
+    };
+    USUARIOS.push(usuario);
+    this.versionAdmin.update((v) => v + 1);
+    return of({ ...usuario });
+  }
+
+  editarUsuario(id: string, cambios: CambiosUsuario): Observable<Usuario> {
+    const usuario = USUARIOS.find((u) => u.id === id);
+    if (!usuario) {
+      return throwError(() => new PeceraNoDisponibleError('No encontramos ese usuario.'));
+    }
+    // La contraseña no se guarda en memoria: el mock no tiene login real
+    const resto: CambiosUsuario = { ...cambios };
+    delete resto.password;
+    Object.assign(usuario, resto);
+    this.versionAdmin.update((v) => v + 1);
+    return of({ ...usuario });
   }
 
   dispositivosAdmin(): Observable<DispositivoAdmin[]> {
-    return of(DISPOSITIVOS.map((dispositivo) => this.adminDe(dispositivo)));
+    return this.admin$.pipe(map(() => DISPOSITIVOS.map((d) => this.adminDe(d))));
   }
 
   dispositivoAdmin(id: string): Observable<DispositivoAdmin | null> {
-    const dispositivo = DISPOSITIVOS.find((item) => item.id === id);
-    return of(dispositivo ? this.adminDe(dispositivo) : null);
+    return this.admin$.pipe(
+      map(() => {
+        const dispositivo = DISPOSITIVOS.find((item) => item.id === id);
+        return dispositivo ? this.adminDe(dispositivo) : null;
+      }),
+    );
+  }
+
+  registrarDispositivo(datos: NuevoDispositivo): Observable<DispositivoAdmin> {
+    const id = datos.id.trim().toLowerCase();
+    if (!/^af-[0-9a-f]{12}$/.test(id)) {
+      return throwError(
+        () =>
+          new PeceraNoDisponibleError(
+            'El ID tiene que ser af- seguido de 12 caracteres hexadecimales (la MAC).',
+          ),
+      );
+    }
+    if (DISPOSITIVOS.some((d) => d.id === id)) {
+      return throwError(() => new PeceraNoDisponibleError('Ese dispositivo ya está registrado.'));
+    }
+    const dispositivo: Dispositivo = {
+      id,
+      nombre: datos.nombre?.trim() || `AquaFeed ${id}`,
+      ownerId: datos.usuarioId,
+      speciesProfileId: null,
+      tz: ZONA,
+      configVersion: 0,
+      configAplicada: null,
+      lastSeen: null,
+      online: false,
+      estado: datos.usuarioId ? 'claimed' : 'unclaimed',
+      fw: null,
+      rssi: null,
+    };
+    DISPOSITIVOS.push(dispositivo);
+    this.versionAdmin.update((v) => v + 1);
+    return of(this.adminDe(dispositivo));
+  }
+
+  asignarDispositivo(id: string, usuarioId: string | null): Observable<DispositivoAdmin> {
+    const dispositivo = DISPOSITIVOS.find((d) => d.id === id);
+    if (!dispositivo) {
+      return throwError(() => new PeceraNoDisponibleError('No encontramos ese dispositivo.'));
+    }
+    if (usuarioId && !USUARIOS.some((u) => u.id === usuarioId && u.activo)) {
+      return throwError(
+        () => new PeceraNoDisponibleError('Ese usuario no existe o está deshabilitado.'),
+      );
+    }
+    dispositivo.ownerId = usuarioId;
+    dispositivo.estado = usuarioId ? 'claimed' : 'unclaimed';
+    this.versionAdmin.update((v) => v + 1);
+    return of(this.adminDe(dispositivo));
   }
 
   alertasAdmin(): Observable<AlertaVista[]> {

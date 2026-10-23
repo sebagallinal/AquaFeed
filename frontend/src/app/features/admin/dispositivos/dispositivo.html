@@ -45,10 +45,39 @@
         <dd>{{ placa.tz }}</dd>
       </div>
     </dl>
+    <form class="af-panel af-admin-form" (submit)="$event.preventDefault(); guardar()">
+      <h2>Dueño</h2>
+      <label class="af-field">
+        <span>Usuario que ve y maneja esta pecera</span>
+        <select (change)="elegido.set($any($event.target).value)">
+          <option value="" [selected]="dueno() === ''">Sin dueño</option>
+          @for (u of activos(); track u.id) {
+            <option [value]="u.id" [selected]="dueno() === u.id">
+              {{ u.nombre }} · {{ u.email }}
+            </option>
+          }
+        </select>
+      </label>
+      <p class="af-hint">
+        Al cambiar de dueño se conservan el nombre, la especie, los horarios y las alertas de la
+        pecera.
+      </p>
+      @if (aviso(); as a) {
+        <p [class]="a.tipo === 'ok' ? 'af-ok' : 'af-alert'" role="status">{{ a.texto }}</p>
+      }
+      <div class="af-actions">
+        <button type="submit" class="af-btn af-btn--primary" [disabled]="!cambio() || guardando()">
+          Guardar dueño
+        </button>
+      </div>
+    </form>
+
     <aside class="af-note">
       <p>
-        Regenerar el código, reasignar y los comandos de mantenimiento (ping, reinicio) quedan para
-        el backend. Desde acá no se alimenta una pecera ajena.
+        Para que una placa nueva se conecte necesita su certificado: en el servidor,
+        <code>sudo ./deploy/gen-certs.sh client {{ placa.id }}</code
+        >, y después grabarla con ese certificado (ver <code>firmware/README.md</code>). Desde acá
+        no se alimenta una pecera ajena.
       </p>
     </aside>
   } @else {

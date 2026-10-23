@@ -179,8 +179,15 @@ const authenticateToken = (req, res, next) => {
     if (err) {
       return res.status(403).json({ message: 'Token inválido o expirado' });
     }
-    req.user = user;
-    next();
+    // Una cuenta deshabilitada deja de funcionar aunque tenga un token vigente,
+    // y el rol sale de la base (el del token puede haber cambiado)
+    db.accountState(user.id)
+      .then(({ activo, rol }) => {
+        if (!activo) return res.status(401).json({ message: 'La cuenta está deshabilitada.' });
+        req.user = { ...user, role: rol };
+        next();
+      })
+      .catch(next);
   });
 };
 

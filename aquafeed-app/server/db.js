@@ -79,7 +79,10 @@ async function listUsers() {
 
 // Usuario en el formato del frontend nuevo (frontend/src/app/shared/models/usuario.model.ts)
 function toUsuario(row) {
-  return { id: String(row.id), nombre: row.nombre, email: row.email, rol: row.rol, activo: !!row.activo };
+  return {
+    id: String(row.id), nombre: row.nombre, email: row.email, rol: row.rol, activo: !!row.activo,
+    username: row.username,
+  };
 }
 
 async function listUsuarios() {
@@ -90,6 +93,77 @@ async function listUsuarios() {
 async function findUserById(id) {
   const [rows] = await pool.query('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [id]);
   return rows[0];
+}
+
+// ---------- Administración de cuentas ----------
+
+async function findUserByEmail(email) {
+  const [rows] = await pool.query('SELECT * FROM usuarios WHERE email = ? LIMIT 1', [email]);
+  return rows[0];
+}
+
+// El usuario para entrar sale de la parte del correo antes de la @ (con un número si se repite).
+// También se puede entrar con el correo completo.
+async function usernameLibre(email) {
+  const base = email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40) || 'usuario';
+  for (let i = 0; i < 1000; i++) {
+    const candidato = i === 0 ? base : `${base}${i + 1}`;
+    const [rows] = await pool.query('SELECT 1 FROM usuarios WHERE username = ? LIMIT 1', [candidato]);
+    if (rows.length === 0) return candidato;
+  }
+  throw new Error('No se encontró un nombre de usuario libre');
+}
+
+async function createUser({ nombre, email, password, rol }) {
+  const username = await usernameLibre(email);
+  const [r] = await pool.query(
+    'INSERT INTO usuarios (username, email, password_hash, rol, nombre, activo) VALUES (?, ?, ?, ?, ?, 1)',
+    [username, email, await bcrypt.hash(password, 10), rol, nombre]
+  );
+  return findUserById(r.insertId);
+}
+
+async function updateUser(id, { nombre, email, rol, activo, password }) {
+  const sets = [];
+  const valores = [];
+  if (nombre !== undefined) { sets.push('nombre = ?'); valores.push(nombre); }
+  if (email !== undefined) { sets.push('email = ?'); valores.push(email); }
+  if (rol !== undefined) { sets.push('rol = ?'); valores.push(rol); }
+  if (activo !== undefined) { sets.push('activo = ?'); valores.push(activo ? 1 : 0); }
+  if (password !== undefined) { sets.push('password_hash = ?'); valores.push(await bcrypt.hash(password, 10)); }
+  if (sets.length) {
+    await pool.query(`UPDATE usuarios SET ${sets.join(', ')} WHERE id = ?`, [...valores, id]);
+  }
+  return findUserById(id);
+}
+
+async function countActiveAdmins() {
+  const [[{ n }]] = await pool.query("SELECT COUNT(*) AS n FROM usuarios WHERE rol = 'admin' AND activo = 1");
+  return n;
+}
+
+// Estado real de la cuenta: un token viejo no sirve si el admin la deshabilitó o le cambió el rol.
+// Se cachea unos segundos para no consultar la base en cada pedido.
+const cacheCuenta = new Map();   // id -> { activo, rol, hasta }
+async function accountState(id) {
+  const guardado = cacheCuenta.get(id);
+  if (guardado && guardado.hasta > Date.now()) return guardado;
+  const row = await findUserById(id);
+  const estado = { activo: !!row?.activo, rol: row?.rol ?? null, hasta: Date.now() + 15 * 1000 };
+  cacheCuenta.set(id, estado);
+  return estado;
+}
+const forgetAccountState = (id) => cacheCuenta.delete(Number(id));
+
+// Asigna (o quita, con null) el dueño. Al cambiar de dueño no se toca el nombre ni la config.
+async function assignDevice(id, usuarioId) {
+  await pool.query('UPDATE dispositivos SET usuario_id = ? WHERE id = ?', [usuarioId, id]);
+}
+
+// Alta de una placa antes de que se conecte por primera vez (el ID sale del monitor serie)
+async function createDevice(id, nombre, usuarioId) {
+  await pool.query('INSERT INTO dispositivos (id, nombre, usuario_id) VALUES (?, ?, ?)', [id, nombre, usuarioId]);
+  knownDevices.add(id);
 }
 
 const SELECT_DISPOSITIVO =
@@ -392,4 +466,6 @@ module.exports = {
   listSchedules, replaceSchedules, getReport, updateDevice,
   CONFIG_ALERTAS_DEFECTO, listAlertConfigs, getAlertConfig, saveAlertConfig,
   openAlert, closeAlert, listActiveAlerts, listAlerts, acknowledgeAlert, countOpenAlerts,
+  findUserByEmail, createUser, updateUser, countActiveAdmins, accountState, forgetAccountState,
+  assignDevice, createDevice,
 };

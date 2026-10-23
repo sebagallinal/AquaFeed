@@ -1,0 +1,34 @@
+<label class="af-field">
+  <span>{{ etiqueta() }}</span>
+  <select (change)="seleccion.set($any($event.target).value)">
+    <option value="" [selected]="seleccion() === ''">{{ textoNinguno() }}</option>
+    @for (d of libres(); track d.id) {
+      <option [value]="d.id" [selected]="seleccion() === d.id">
+        {{ d.nombre }} · {{ d.id }}{{ d.online ? ' · en línea' : '' }}
+      </option>
+    }
+    <option [value]="otro" [selected]="seleccion() === otro">Otra placa: escribir el ID…</option>
+  </select>
+</label>
+
+@if (seleccion() === otro) {
+  <label class="af-field">
+    <span>ID de la placa</span>
+    <input
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="af-240ac45ed754"
+      [value]="idNuevo()"
+      (input)="idNuevo.set($any($event.target).value)"
+    />
+  </label>
+  <p class="af-hint">
+    @if (idInvalido()) {
+      El ID es af- seguido de los 12 caracteres de la MAC.
+    } @else {
+      Sale en el monitor serie al grabar la placa («ID del dispositivo»). Se puede asignar antes de
+      que se conecte.
+    }
+  </p>
+}

@@ -8,7 +8,7 @@ import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
 import type { PeriodoReporte, ReporteDatos } from '../models/reporte.model';
-import type { Usuario } from '../models/usuario.model';
+import type { CambiosUsuario, NuevoUsuario, Usuario } from '../models/usuario.model';
 
 export interface PeceraResumen {
   dispositivo: Dispositivo;
@@ -20,6 +20,12 @@ export interface PeceraResumen {
 
 export interface PeceraDetalle extends PeceraResumen {
   horarios: Horario[];
+}
+
+export interface NuevoDispositivo {
+  id: string;
+  nombre?: string;
+  usuarioId: string | null;
 }
 
 export interface CambiosPecera {
@@ -105,7 +111,13 @@ export interface DatosApi {
   resumenAdmin(): Observable<ResumenAdmin>;
   usuarios(): Observable<Usuario[]>;
   usuario(id: string): Observable<Usuario | null>;
+  crearUsuario(datos: NuevoUsuario): Observable<Usuario>;
+  editarUsuario(id: string, cambios: CambiosUsuario): Observable<Usuario>;
   dispositivosAdmin(): Observable<DispositivoAdmin[]>;
+  /** Alta de una placa por su ID (af- + MAC) antes de que se conecte. */
+  registrarDispositivo(datos: NuevoDispositivo): Observable<DispositivoAdmin>;
+  /** Cambia el dueño de una placa; null la deja sin dueño. */
+  asignarDispositivo(id: string, usuarioId: string | null): Observable<DispositivoAdmin>;
   dispositivoAdmin(id: string): Observable<DispositivoAdmin | null>;
   alertasAdmin(): Observable<AlertaVista[]>;
 }

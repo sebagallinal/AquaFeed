@@ -9,7 +9,7 @@ import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
 import type { AlimentacionReporte, PeriodoReporte, ReporteDatos } from '../models/reporte.model';
-import type { Usuario } from '../models/usuario.model';
+import type { CambiosUsuario, NuevoUsuario, Usuario } from '../models/usuario.model';
 import {
   DatosApi,
   PeceraNoDisponibleError,
@@ -18,6 +18,7 @@ import {
   type ComandoAlimentacion,
   type DispositivoAdmin,
   type HorariosGuardados,
+  type NuevoDispositivo,
   type PeceraDetalle,
   type PeceraResumen,
   type ResumenAdmin,
@@ -199,6 +200,32 @@ export class HttpDatosService implements DatosApi {
       .pipe(catchError(nullSiNoExiste));
   }
 
+  crearUsuario(datos: NuevoUsuario): Observable<Usuario> {
+    return this.http
+      .post<Usuario>(`${API}/admin/usuarios`, datos)
+      .pipe(catchError(conMensaje('No se pudo crear el usuario.')));
+  }
+
+  editarUsuario(id: string, cambios: CambiosUsuario): Observable<Usuario> {
+    return this.http
+      .patch<Usuario>(`${API}/admin/usuarios/${encodeURIComponent(id)}`, cambios)
+      .pipe(catchError(conMensaje('No se pudieron guardar los cambios.')));
+  }
+
+  registrarDispositivo(datos: NuevoDispositivo): Observable<DispositivoAdmin> {
+    return this.http
+      .post<DispositivoAdmin>(`${API}/admin/dispositivos`, datos)
+      .pipe(map(conEspecie), catchError(conMensaje('No se pudo registrar el dispositivo.')));
+  }
+
+  asignarDispositivo(id: string, usuarioId: string | null): Observable<DispositivoAdmin> {
+    return this.http
+      .patch<DispositivoAdmin>(`${API}/admin/dispositivos/${encodeURIComponent(id)}`, {
+        usuarioId,
+      })
+      .pipe(map(conEspecie), catchError(conMensaje('No se pudo asignar el dispositivo.')));
+  }
+
   dispositivosAdmin(): Observable<DispositivoAdmin[]> {
     return this.enVivo(() => this.http.get<DispositivoAdmin[]>(`${API}/admin/dispositivos`)).pipe(
       map((lista) => lista.map(conEspecie)),
@@ -250,6 +277,12 @@ function nullSiNoExiste(error: unknown): Observable<null> {
   return error instanceof HttpErrorResponse && error.status === 404
     ? of(null)
     : throwError(() => error);
+}
+
+/** Convierte el error HTTP en un error con el mensaje del backend, para mostrarlo tal cual. */
+function conMensaje(porDefecto: string) {
+  return (error: unknown): Observable<never> =>
+    throwError(() => new PeceraNoDisponibleError(mensajeDe(error, porDefecto)));
 }
 
 function mensajeDe(error: unknown, porDefecto = 'No se pudo enviar el comando.'): string {

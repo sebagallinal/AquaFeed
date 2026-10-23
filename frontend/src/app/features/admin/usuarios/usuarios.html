@@ -1,20 +1,143 @@
 <section class="af-page">
-  <header class="af-page-head">
-    <p class="af-kicker">Cuentas</p>
-    <h1>Usuarios</h1>
-    <p>
-      Habilitar, cambiar el rol o resetear la contraseña llega con el
-      backend.
-    </p>
+  <header class="af-page-head af-page-head--row">
+    <div>
+      <p class="af-kicker">Cuentas</p>
+      <h1>Usuarios</h1>
+      <p>Alta de cuentas y asignación de alimentadores.</p>
+    </div>
+    @if (!abierto()) {
+      <button type="button" class="af-btn af-btn--primary" (click)="abrir()">Nuevo usuario</button>
+    }
   </header>
+
+  @if (creada(); as c) {
+    <aside class="af-panel af-created" role="status">
+      <h2>Cuenta creada: {{ c.usuario.nombre }}</h2>
+      <p class="af-hint">Pasale estos datos. La contraseña no se vuelve a mostrar.</p>
+      <dl class="af-created__data">
+        <div>
+          <dt>Usuario</dt>
+          <dd>
+            <code>{{ c.usuario.username ?? c.usuario.email }}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>Correo</dt>
+          <dd>
+            <code>{{ c.usuario.email }}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>Contraseña</dt>
+          <dd>
+            <code>{{ c.password }}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>Alimentador</dt>
+          <dd>
+            @if (c.dispositivo; as d) {
+              {{ d.nombre }} · <code>{{ d.id }}</code>
+            } @else {
+              Ninguno
+            }
+          </dd>
+        </div>
+      </dl>
+      @if (c.errorDispositivo) {
+        <p class="af-alert">
+          La cuenta se creó, pero la placa no: {{ c.errorDispositivo }} Asignala desde la ficha del
+          usuario.
+        </p>
+      }
+      <div class="af-actions">
+        <button type="button" class="af-btn af-btn--ghost" (click)="copiar(c)">Copiar datos</button>
+        <a class="af-btn af-btn--ghost" [routerLink]="['/admin/usuarios', c.usuario.id]">
+          Ver ficha
+        </a>
+        <button type="button" class="af-btn af-btn--ghost" (click)="creada.set(null)">
+          Cerrar
+        </button>
+      </div>
+    </aside>
+  }
+
+  @if (abierto()) {
+    <form class="af-panel af-admin-form" (submit)="$event.preventDefault(); crear()">
+      <h2>Nuevo usuario</h2>
+      <div class="af-form-grid">
+        <label class="af-field">
+          <span>Nombre</span>
+          <input
+            type="text"
+            autocomplete="off"
+            [value]="nombre()"
+            (input)="nombre.set($any($event.target).value)"
+          />
+        </label>
+        <label class="af-field">
+          <span>Correo</span>
+          <input
+            type="email"
+            autocomplete="off"
+            [value]="email()"
+            (input)="email.set($any($event.target).value)"
+          />
+        </label>
+        <div class="af-field">
+          <label for="clave-nueva">Contraseña temporal</label>
+          <div class="af-input-row">
+            <input
+              id="clave-nueva"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              [value]="password()"
+              (input)="password.set($any($event.target).value)"
+            />
+            <button type="button" class="af-btn af-btn--ghost af-btn--small" (click)="nuevaClave()">
+              Generar
+            </button>
+          </div>
+        </div>
+        <label class="af-field">
+          <span>Rol</span>
+          <select (change)="rol.set($any($event.target).value)">
+            <option value="user" [selected]="rol() === 'user'">Usuario (dueño de peceras)</option>
+            <option value="admin" [selected]="rol() === 'admin'">Administrador</option>
+          </select>
+        </label>
+      </div>
+
+      <app-elegir-dispositivo
+        etiqueta="Alimentador"
+        [dispositivos]="dispositivos()"
+        [(seleccion)]="seleccion"
+        [(idNuevo)]="idNuevo"
+      />
+
+      @if (errorServidor() ?? (intentado() ? error() : null); as problema) {
+        <p class="af-alert" role="alert">{{ problema }}</p>
+      }
+
+      <div class="af-actions">
+        <button type="submit" class="af-btn af-btn--primary" [disabled]="guardando()">
+          {{ guardando() ? 'Creando…' : 'Crear usuario' }}
+        </button>
+        <button type="button" class="af-btn af-btn--ghost" (click)="cancelar()">Cancelar</button>
+      </div>
+    </form>
+  }
 
   <div class="af-table-wrap">
     <table class="af-table">
       <thead>
         <tr>
           <th scope="col">Nombre</th>
+          <th scope="col">Usuario</th>
           <th scope="col">Correo</th>
           <th scope="col">Rol</th>
+          <th scope="col">Peceras</th>
           <th scope="col">Estado</th>
         </tr>
       </thead>
@@ -24,8 +147,12 @@
             <td>
               <a [routerLink]="['/admin/usuarios', usuario.id]">{{ usuario.nombre }}</a>
             </td>
+            <td>
+              <code>{{ usuario.username ?? '—' }}</code>
+            </td>
             <td>{{ usuario.email }}</td>
             <td>{{ etiquetaRol(usuario.rol) }}</td>
+            <td>{{ pecerasPor().get(usuario.id) ?? 0 }}</td>
             <td>{{ usuario.activo ? 'Activo' : 'Deshabilitado' }}</td>
           </tr>
         }

@@ -7,7 +7,19 @@ export interface Usuario {
   email: string;
   rol: Rol;
   activo: boolean;
+  /** Usuario para entrar (también se puede entrar con el correo). */
+  username?: string;
 }
+
+export interface NuevoUsuario {
+  nombre: string;
+  email: string;
+  password: string;
+  rol: Rol;
+}
+
+/** Solo viaja lo que cambia. */
+export type CambiosUsuario = Partial<NuevoUsuario & { activo: boolean }>;
 
 export interface Credenciales {
   email: string;

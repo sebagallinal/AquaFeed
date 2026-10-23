@@ -1,12 +1,89 @@
 <section class="af-page">
-  <header class="af-page-head">
-    <p class="af-kicker">Provisioning</p>
-    <h1>Dispositivos</h1>
-    <p>
-      Alta de fábrica, código de vinculación y QR llegan con el backend. El secreto MQTT no se
-      muestra en la web.
-    </p>
+  <header class="af-page-head af-page-head--row">
+    <div>
+      <p class="af-kicker">Alimentadores</p>
+      <h1>Dispositivos</h1>
+      <p>
+        Las placas aparecen solas la primera vez que se conectan. También podés registrar una por su
+        ID antes, para dejarla asignada.
+      </p>
+    </div>
+    @if (!abierto()) {
+      <button type="button" class="af-btn af-btn--primary" (click)="abrir()">
+        Registrar dispositivo
+      </button>
+    }
   </header>
+
+  @if (registrada(); as d) {
+    <aside class="af-panel af-created" role="status">
+      <h2>{{ d.nombre }} registrado</h2>
+      <p class="af-hint">
+        Para que se conecte necesita su certificado. En el servidor:
+        <code>sudo ./deploy/gen-certs.sh client {{ d.id }}</code> y después grabar la placa con ese
+        certificado (ver <code>firmware/README.md</code>).
+      </p>
+      <div class="af-actions">
+        <a class="af-btn af-btn--ghost" [routerLink]="['/admin/dispositivos', d.id]">Ver ficha</a>
+        <button type="button" class="af-btn af-btn--ghost" (click)="registrada.set(null)">
+          Cerrar
+        </button>
+      </div>
+    </aside>
+  }
+
+  @if (abierto()) {
+    <form class="af-panel af-admin-form" (submit)="$event.preventDefault(); registrar()">
+      <h2>Registrar dispositivo</h2>
+      <div class="af-form-grid">
+        <label class="af-field">
+          <span>ID de la placa</span>
+          <input
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="af-240ac45ed754"
+            [value]="id()"
+            (input)="id.set($any($event.target).value)"
+          />
+        </label>
+        <label class="af-field">
+          <span>Nombre (opcional)</span>
+          <input
+            type="text"
+            maxlength="60"
+            placeholder="Por ejemplo: Pecera del living"
+            [value]="nombre()"
+            (input)="nombre.set($any($event.target).value)"
+          />
+        </label>
+        <label class="af-field">
+          <span>Dueño</span>
+          <select (change)="dueno.set($any($event.target).value)">
+            <option value="" [selected]="dueno() === ''">Sin dueño por ahora</option>
+            @for (u of activos(); track u.id) {
+              <option [value]="u.id" [selected]="dueno() === u.id">
+                {{ u.nombre }} · {{ u.email }}
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+      <p class="af-hint">
+        El ID sale en el monitor serie al grabar la placa («ID del dispositivo»).
+      </p>
+
+      @if (errorServidor() ?? (intentado() ? error() : null); as problema) {
+        <p class="af-alert" role="alert">{{ problema }}</p>
+      }
+      <div class="af-actions">
+        <button type="submit" class="af-btn af-btn--primary" [disabled]="guardando()">
+          {{ guardando() ? 'Registrando…' : 'Registrar' }}
+        </button>
+        <button type="button" class="af-btn af-btn--ghost" (click)="cancelar()">Cancelar</button>
+      </div>
+    </form>
+  }
 
   <div class="af-table-wrap">
     <table class="af-table">
@@ -28,7 +105,15 @@
             <td>
               <code>{{ dispositivo.id }}</code>
             </td>
-            <td>{{ dispositivo.duenoNombre ?? 'Sin vincular' }}</td>
+            <td>
+              @if (dispositivo.ownerId) {
+                <a [routerLink]="['/admin/usuarios', dispositivo.ownerId]">{{
+                  dispositivo.duenoNombre
+                }}</a>
+              } @else {
+                Sin dueño
+              }
+            </td>
             <td>{{ dispositivo.online ? 'En línea' : 'Sin conexión' }}</td>
             <td>{{ dispositivo.fw ?? '—' }}</td>
           </tr>

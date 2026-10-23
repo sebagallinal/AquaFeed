@@ -307,6 +307,113 @@ module.exports = function apiV1({
     });
   });
 
+  // ---------- Administración: usuarios ----------
+
+  const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Valida los campos que vengan. Con nuevo = true, nombre, correo y contraseña son obligatorios.
+  function validarUsuario(body, nuevo) {
+    const datos = {};
+    if (nuevo || body?.nombre !== undefined) {
+      const nombre = String(body?.nombre ?? '').trim().replace(/\s+/g, ' ');
+      if (nombre.length < 2 || nombre.length > 100) return 'El nombre tiene que tener entre 2 y 100 caracteres.';
+      datos.nombre = nombre;
+    }
+    if (nuevo || body?.email !== undefined) {
+      const email = String(body?.email ?? '').trim().toLowerCase();
+      if (!EMAIL.test(email) || email.length > 100) return 'El correo no es válido.';
+      datos.email = email;
+    }
+    if (nuevo || body?.password !== undefined) {
+      const password = String(body?.password ?? '');
+      if (password.length < 8 || password.length > 72) return 'La contraseña tiene que tener entre 8 y 72 caracteres.';
+      datos.password = password;
+    }
+    if (nuevo || body?.rol !== undefined) {
+      const rol = body?.rol ?? 'user';
+      if (!['admin', 'user'].includes(rol)) return 'El rol no es válido.';
+      datos.rol = rol;
+    }
+    if (!nuevo && body?.activo !== undefined) {
+      if (typeof body.activo !== 'boolean') return 'El estado no es válido.';
+      datos.activo = body.activo;
+    }
+    return datos;
+  }
+
+  router.post('/admin/usuarios', authenticateToken, requireAdmin, async (req, res) => {
+    const datos = validarUsuario(req.body, true);
+    if (typeof datos === 'string') return res.status(400).json({ message: datos });
+    if (await db.findUserByEmail(datos.email)) {
+      return res.status(409).json({ message: 'Ya hay una cuenta con ese correo.' });
+    }
+    const row = await db.createUser(datos);
+    res.status(201).json(db.toUsuario(row));
+  });
+
+  router.patch('/admin/usuarios/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const row = await db.findUserById(req.params.id);
+    if (!row) return res.status(404).json({ message: 'No encontramos ese usuario.' });
+    const datos = validarUsuario(req.body, false);
+    if (typeof datos === 'string') return res.status(400).json({ message: datos });
+
+    if (datos.email && datos.email !== row.email) {
+      const otro = await db.findUserByEmail(datos.email);
+      if (otro && otro.id !== row.id) return res.status(409).json({ message: 'Ya hay una cuenta con ese correo.' });
+    }
+    // Que siempre quede al menos un admin activo, y que nadie se saque el acceso a sí mismo
+    const dejaDeSerAdmin = row.rol === 'admin' && row.activo &&
+      ((datos.rol && datos.rol !== 'admin') || datos.activo === false);
+    if (dejaDeSerAdmin && row.id === req.user.id) {
+      return res.status(409).json({ message: 'No podés sacarte el acceso de administrador a vos mismo.' });
+    }
+    if (dejaDeSerAdmin && (await db.countActiveAdmins()) <= 1) {
+      return res.status(409).json({ message: 'Tiene que quedar al menos un administrador activo.' });
+    }
+
+    const actualizado = await db.updateUser(row.id, datos);
+    db.forgetAccountState(row.id);
+    res.json(db.toUsuario(actualizado));
+  });
+
+  // ---------- Administración: dispositivos ----------
+
+  const ID_DISPOSITIVO = /^af-[0-9a-f]{12}$/;
+
+  // usuarioId: id de un usuario activo, o null para dejar la placa sin dueño
+  async function validarDueno(usuarioId) {
+    if (usuarioId === null || usuarioId === undefined || usuarioId === '') return { usuarioId: null };
+    const dueno = await db.findUserById(usuarioId);
+    if (!dueno || !dueno.activo) return 'Ese usuario no existe o está deshabilitado.';
+    return { usuarioId: dueno.id };
+  }
+
+  // Alta de una placa que todavía no se conectó. El ID sale del monitor serie al grabarla.
+  router.post('/admin/dispositivos', authenticateToken, requireAdmin, async (req, res) => {
+    const id = String(req.body?.id ?? '').trim().toLowerCase();
+    if (!ID_DISPOSITIVO.test(id)) {
+      return res.status(400).json({ message: 'El ID tiene que ser af- seguido de 12 caracteres hexadecimales (la MAC).' });
+    }
+    if (await db.getDevice(id)) return res.status(409).json({ message: 'Ese dispositivo ya está registrado.' });
+    const dueno = await validarDueno(req.body?.usuarioId);
+    if (typeof dueno === 'string') return res.status(400).json({ message: dueno });
+    const nombre = String(req.body?.nombre ?? '').trim().replace(/\s+/g, ' ') || `AquaFeed ${id}`;
+    if (nombre.length > 60) return res.status(400).json({ message: 'El nombre puede tener hasta 60 caracteres.' });
+    await db.createDevice(id, nombre, dueno.usuarioId);
+    res.status(201).json(toDispositivoAdmin(await db.getDevice(id)));
+  });
+
+  // Cambia el dueño (o lo quita con usuarioId: null)
+  router.patch('/admin/dispositivos/:id', authenticateToken, requireAdmin, async (req, res) => {
+    const row = await db.getDevice(req.params.id);
+    if (!row) return res.status(404).json({ message: 'No encontramos ese dispositivo.' });
+    if (req.body?.usuarioId === undefined) return res.status(400).json({ message: 'Falta el usuario.' });
+    const dueno = await validarDueno(req.body.usuarioId);
+    if (typeof dueno === 'string') return res.status(400).json({ message: dueno });
+    await db.assignDevice(row.id, dueno.usuarioId);
+    res.json(toDispositivoAdmin(await db.getDevice(row.id)));
+  });
+
   router.get('/admin/alertas', authenticateToken, requireAdmin, async (req, res) => {
     res.json(await db.listAlerts());
   });
