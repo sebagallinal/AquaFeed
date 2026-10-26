@@ -2,7 +2,7 @@ import { computed, Injectable, signal } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
 
 import type { Credenciales, Usuario } from '../../shared/models/usuario.model';
-import { AuthApi, CredencialesInvalidasError } from './auth-api';
+import { AuthApi, ClaveInvalidaError, CredencialesInvalidasError } from './auth-api';
 import { CLAVE_SESION, emitirTokenMock, type SesionGuardada, sesionValida } from './token-mock';
 
 interface CuentaDemo extends Usuario {
@@ -14,6 +14,8 @@ interface CuentaDemo extends Usuario {
  * Las mismas credenciales están en el README, marcadas como solo para desarrollo.
  */
 const CLAVE_DEMO = '12341234';
+/** Contraseñas que el usuario cambió en esta pestaña. La de demostración vuelve al cerrarla. */
+const CLAVE_CLAVES = 'aquafeed.claves';
 
 const CUENTAS: readonly CuentaDemo[] = [
   {
@@ -61,13 +63,38 @@ export class MockAuthService implements AuthApi {
   login(credenciales: Credenciales): Observable<Usuario> {
     const email = credenciales.email.trim().toLowerCase();
     const cuenta = CUENTAS.find((item) => item.email === email && item.activo);
-    if (!cuenta || cuenta.password !== credenciales.password) {
+    if (!cuenta || this.claveDe(cuenta.id, cuenta.password) !== credenciales.password) {
       return throwError(() => new CredencialesInvalidasError());
     }
     const usuario = this.sinPassword(cuenta);
     const token = emitirTokenMock(usuario);
     this.guardar({ token, usuario });
     return of(usuario);
+  }
+
+  cambiarClave(passwordActual: string, password: string): Observable<void> {
+    const sesion = this.usuario();
+    const cuenta = CUENTAS.find((item) => item.id === sesion?.id);
+    if (!sesion || !cuenta) {
+      return throwError(() => new ClaveInvalidaError('Tenés que iniciar sesión.'));
+    }
+    if (this.claveDe(cuenta.id, cuenta.password) !== passwordActual) {
+      return throwError(() => new ClaveInvalidaError('La contraseña actual no coincide.'));
+    }
+    if (password.length < 8 || password.length > 72) {
+      return throwError(
+        () => new ClaveInvalidaError('La contraseña tiene que tener entre 8 y 72 caracteres.'),
+      );
+    }
+    if (password === passwordActual) {
+      return throwError(
+        () => new ClaveInvalidaError('La nueva contraseña tiene que ser distinta de la actual.'),
+      );
+    }
+    const mapa = this.clavesGuardadas();
+    mapa[cuenta.id] = password;
+    this.almacenamiento()?.setItem(CLAVE_CLAVES, JSON.stringify(mapa));
+    return of(undefined);
   }
 
   logout(): void {
@@ -111,6 +138,32 @@ export class MockAuthService implements AuthApi {
     } catch {
       this.almacenamiento()?.removeItem(CLAVE_SESION);
       return null;
+    }
+  }
+
+  private claveDe(id: string, porDefecto: string): string {
+    return this.clavesGuardadas()[id] ?? porDefecto;
+  }
+
+  private clavesGuardadas(): Record<string, string> {
+    const crudo = this.almacenamiento()?.getItem(CLAVE_CLAVES);
+    if (!crudo) {
+      return {};
+    }
+    try {
+      const data: unknown = JSON.parse(crudo);
+      if (typeof data !== 'object' || data === null) {
+        return {};
+      }
+      const mapa: Record<string, string> = {};
+      for (const [id, clave] of Object.entries(data)) {
+        if (typeof clave === 'string') {
+          mapa[id] = clave;
+        }
+      }
+      return mapa;
+    } catch {
+      return {};
     }
   }
 

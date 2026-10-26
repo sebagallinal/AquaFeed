@@ -77,4 +77,33 @@ describe('MockAuthService', () => {
     sessionStorage.setItem(CLAVE_SESION, '{');
     expect(new MockAuthService().autenticado()).toBe(false);
   });
+
+  it('cambia la contraseña y la próxima entrada usa la nueva', () => {
+    const auth = new MockAuthService();
+    auth.login({ email: 'nahuel.mota@correo.com', password: '12341234' }).subscribe();
+
+    let cambiada = false;
+    auth.cambiarClave('12341234', 'nueva-clave').subscribe(() => {
+      cambiada = true;
+    });
+    expect(cambiada).toBe(true);
+
+    auth.logout();
+    let email = '';
+    auth
+      .login({ email: 'nahuel.mota@correo.com', password: 'nueva-clave' })
+      .subscribe((usuario) => {
+        email = usuario.email;
+      });
+    expect(email).toBe('nahuel.mota@correo.com');
+
+    auth.logout();
+    let rechazo = false;
+    auth.login({ email: 'nahuel.mota@correo.com', password: '12341234' }).subscribe({
+      error: () => {
+        rechazo = true;
+      },
+    });
+    expect(rechazo).toBe(true);
+  });
 });

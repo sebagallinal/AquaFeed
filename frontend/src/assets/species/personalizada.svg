@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" role="img" aria-label="Pez genérico">
+  <rect width="960" height="600" fill="#e7f3f1"/>
+  <g fill="#1f6f68">
+    <ellipse cx="500" cy="310" rx="190" ry="96"/>
+    <polygon points="310,310 170,220 190,310 170,400"/>
+    <circle cx="610" cy="285" r="14" fill="#f4fbfa"/>
+  </g>
+</svg>

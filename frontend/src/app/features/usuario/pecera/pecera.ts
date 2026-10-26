@@ -3,12 +3,11 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { map, of, switchMap } from 'rxjs';
+import { forkJoin, map, of, switchMap } from 'rxjs';
 
 import { AUTH_API } from '../../../core/auth/auth-api';
 import { aplicarEspecie, listaSensores } from '../../../shared/alertas';
 import { DATOS_API, type CambiosPecera, type PeceraDetalle } from '../../../shared/data/datos-api';
-import { ESPECIES } from '../../../shared/data/especies.mock';
 import { haceCuanto, textoPh, textoPorciones, textoTds, textoTemp } from '../../../shared/formato';
 import type { PerfilEspecie } from '../../../shared/models/perfil-especie.model';
 import {
@@ -49,25 +48,28 @@ export class Pecera {
   }
 
   protected editar(pecera: PeceraDetalle): void {
-    const ref = this.dialog.open<EditarPeceraDialog, EditarPeceraData, CambiosPecera>(
-      EditarPeceraDialog,
-      {
-        data: {
-          nombre: pecera.dispositivo.nombre,
-          especieId: pecera.dispositivo.speciesProfileId,
-          especies: ESPECIES,
+    const usuarioId = this.auth.usuario()?.id ?? '';
+    forkJoin({
+      catalogo: this.datos.especies(),
+      plantillas: this.datos.plantillasDe(usuarioId),
+    }).subscribe(({ catalogo, plantillas }) => {
+      const ref = this.dialog.open<EditarPeceraDialog, EditarPeceraData, CambiosPecera>(
+        EditarPeceraDialog,
+        {
+          data: {
+            nombre: pecera.dispositivo.nombre,
+            especieId: pecera.dispositivo.speciesProfileId,
+            especies: [...plantillas, ...catalogo],
+          },
+          width: 'min(460px, calc(100vw - 32px))',
         },
-        width: 'min(460px, calc(100vw - 32px))',
-      },
-    );
-    ref.afterClosed().subscribe((cambios) => {
-      if (!cambios) {
-        return;
-      }
-      const cambioEspecie = cambios.especieId !== pecera.dispositivo.speciesProfileId;
-      this.datos
-        .editarPecera(pecera.dispositivo.id, this.auth.usuario()?.id ?? '', cambios)
-        .subscribe({
+      );
+      ref.afterClosed().subscribe((cambios) => {
+        if (!cambios) {
+          return;
+        }
+        const cambioEspecie = cambios.especieId !== pecera.dispositivo.speciesProfileId;
+        this.datos.editarPecera(pecera.dispositivo.id, usuarioId, cambios).subscribe({
           next: (actualizada) => {
             // Se ve el cambio enseguida, sin esperar el próximo refresco
             this.detalle.update((d) => (d ? { ...d, ...actualizada } : d));
@@ -83,6 +85,7 @@ export class Pecera {
             this.snack.open(mensaje, 'Cerrar', { duration: 5000 });
           },
         });
+      });
     });
   }
 

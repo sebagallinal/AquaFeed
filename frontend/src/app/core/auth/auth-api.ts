@@ -11,6 +11,8 @@ export interface AuthApi {
   readonly usuario: Signal<Usuario | null>;
   readonly autenticado: Signal<boolean>;
   login(credenciales: Credenciales): Observable<Usuario>;
+  /** Cambia la contraseña de la sesión actual. Falla si la actual no coincide. */
+  cambiarClave(passwordActual: string, password: string): Observable<void>;
   logout(): void;
   /** Access token actual, o null si no hay sesión. El interceptor lo manda como Bearer. */
   token(): string | null;
@@ -22,5 +24,12 @@ export class CredencialesInvalidasError extends Error {
   constructor() {
     super('El correo o la contraseña no coinciden.');
     this.name = 'CredencialesInvalidasError';
+  }
+}
+
+export class ClaveInvalidaError extends Error {
+  constructor(mensaje: string) {
+    super(mensaje);
+    this.name = 'ClaveInvalidaError';
   }
 }

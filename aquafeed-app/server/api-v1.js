@@ -168,6 +168,24 @@ module.exports = function apiV1({
     res.json({ token, usuario: db.toUsuario(row) });
   });
 
+  // El dueño cambia su propia contraseña. La actual tiene que coincidir.
+  router.patch('/cuenta/clave', authenticateToken, async (req, res) => {
+    const passwordActual = String(req.body?.passwordActual ?? '');
+    const password = String(req.body?.password ?? '');
+    if (password.length < 8 || password.length > 72) {
+      return res.status(400).json({ message: 'La contraseña tiene que tener entre 8 y 72 caracteres.' });
+    }
+    if (password === passwordActual) {
+      return res.status(400).json({ message: 'La nueva contraseña tiene que ser distinta de la actual.' });
+    }
+    const row = await db.findUserById(req.user.id);
+    if (!row || !(await bcrypt.compare(passwordActual, row.password_hash))) {
+      return res.status(401).json({ message: 'La contraseña actual no coincide.' });
+    }
+    await db.updateUser(row.id, { password });
+    res.json({ ok: true });
+  });
+
   router.get('/peceras', authenticateToken, async (req, res) => {
     const rows = await db.listDevices(req.user.id);
     const horarios = await db.listSchedules(rows.map((r) => r.id));

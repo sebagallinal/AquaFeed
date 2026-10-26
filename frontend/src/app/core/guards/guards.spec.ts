@@ -32,6 +32,7 @@ describe('guards', () => {
       usuario: sesion.asReadonly(),
       autenticado: computed(() => sesion() !== null),
       login: () => of(actual ?? usuario('user')),
+      cambiarClave: () => of(undefined),
       logout: () => sesion.set(null),
       token: () => (sesion() ? 'mock.token.dev' : null),
     };

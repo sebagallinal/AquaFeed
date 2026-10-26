@@ -31,6 +31,9 @@
         Sin especie no hay rangos para comparar las lecturas.
       }
     </p>
+    <p class="af-hint">
+      <a routerLink="/app/especies/nueva" (click)="cerrar()">Agregar especie</a>
+    </p>
 
     @if (error(); as e) {
       <p class="af-alert" role="alert">{{ e }}</p>

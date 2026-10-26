@@ -22,6 +22,7 @@ describe('authInterceptor', () => {
       usuario: signal(token ? persona : null).asReadonly(),
       autenticado: computed(() => token !== null),
       login: () => of(persona),
+      cambiarClave: () => of(undefined),
       logout: () => undefined,
       token: () => token,
     };

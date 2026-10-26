@@ -114,6 +114,9 @@
             <p class="af-kicker">{{ especie.nombreCientifico }}</p>
             <h2>{{ especie.nombre }}</h2>
             <p class="af-badges">
+              @if (especie.personalizada) {
+                <span class="af-badge af-badge--feed">Personalizada</span>
+              }
               @for (tipo of especie.tiposAgua; track tipo) {
                 <span class="af-badge af-badge--neutral">{{ etiquetaTipoAgua(tipo) }}</span>
               }

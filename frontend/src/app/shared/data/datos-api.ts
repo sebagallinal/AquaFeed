@@ -7,6 +7,7 @@ import type { Dispositivo } from '../models/dispositivo.model';
 import type { Horario, HorarioEditable } from '../models/horario.model';
 import type { Lectura } from '../models/lectura.model';
 import type { PerfilEspecie } from '../models/perfil-especie.model';
+import type { NuevaPlantilla } from '../especies/plantillas';
 import type { PeriodoReporte, ReporteDatos } from '../models/reporte.model';
 import type { CambiosUsuario, NuevoUsuario, Usuario } from '../models/usuario.model';
 
@@ -83,6 +84,9 @@ export interface DatosApi {
   reconocerAlerta(alertaId: string, usuarioId: string): Observable<void>;
   especies(): Observable<PerfilEspecie[]>;
   especie(slug: string): Observable<PerfilEspecie | null>;
+  /** Plantillas que armó este usuario en este navegador. */
+  plantillasDe(usuarioId: string): Observable<PerfilEspecie[]>;
+  crearPlantilla(usuarioId: string, datos: NuevaPlantilla): Observable<PerfilEspecie>;
   alimentar(deviceId: string, usuarioId: string, portions: number): Observable<ComandoAlimentacion>;
   /** Cambia el nombre o la especie (null = sin especie). Devuelve la pecera actualizada. */
   editarPecera(

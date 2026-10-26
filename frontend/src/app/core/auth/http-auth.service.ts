@@ -3,7 +3,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { catchError, map, Observable, tap, throwError } from 'rxjs';
 
 import type { Credenciales, Usuario } from '../../shared/models/usuario.model';
-import { AuthApi, CredencialesInvalidasError } from './auth-api';
+import { AuthApi, ClaveInvalidaError, CredencialesInvalidasError } from './auth-api';
 import { CLAVE_SESION, type SesionGuardada } from './token-mock';
 
 /** Autenticación contra el backend: `POST /api/v1/auth/login` devuelve el JWT y el usuario. */
@@ -26,6 +26,23 @@ export class HttpAuthService implements AuthApi {
             : new Error('No pudimos conectar con el servidor. Probá de nuevo en un rato.'),
         ),
       ),
+    );
+  }
+
+  cambiarClave(passwordActual: string, password: string): Observable<void> {
+    return this.http.patch('/api/v1/cuenta/clave', { passwordActual, password }).pipe(
+      map(() => undefined),
+      catchError((error: unknown) => {
+        const cuerpo: unknown = error instanceof HttpErrorResponse ? error.error : null;
+        const mensaje =
+          typeof cuerpo === 'object' &&
+          cuerpo !== null &&
+          'message' in cuerpo &&
+          typeof cuerpo.message === 'string'
+            ? cuerpo.message
+            : 'No pudimos cambiar la contraseña.';
+        return throwError(() => new ClaveInvalidaError(mensaje));
+      }),
     );
   }
 

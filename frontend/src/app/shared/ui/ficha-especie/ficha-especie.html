@@ -54,7 +54,11 @@
           @if (ficha.ambiente.volumenEstimado) {
             <span class="af-badge af-badge--est">Estimado</span>
           }
-          {{ textoVolumen(ficha.ambiente) }}
+          {{
+            ficha.personalizada && ficha.ambiente.volumenMinLitros === null
+              ? 'Sin definir'
+              : textoVolumen(ficha.ambiente)
+          }}
         </dd>
       </div>
       <div>
@@ -215,14 +219,22 @@
           <dd>
             {{
               ficha.porcionesSugeridas === null
-                ? 'Pendiente de bibliografía'
+                ? ficha.personalizada
+                  ? 'Sin definir'
+                  : 'Pendiente de bibliografía'
                 : ficha.porcionesSugeridas
             }}
           </dd>
         </div>
         <div>
           <dt>Frecuencia sugerida</dt>
-          <dd>{{ ficha.frecuenciaSugerida ?? 'Pendiente de bibliografía' }}</dd>
+          <dd>
+            {{
+              ficha.personalizada && !ficha.frecuenciaSugerida
+                ? 'Sin definir'
+                : (ficha.frecuenciaSugerida ?? 'Pendiente de bibliografía')
+            }}
+          </dd>
         </div>
       </dl>
     </section>

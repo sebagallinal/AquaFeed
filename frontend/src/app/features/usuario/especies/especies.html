@@ -1,10 +1,14 @@
 <section class="af-page">
-  <header class="af-page-head">
-    <p class="af-kicker">Guía</p>
-    <h1>Especies</h1>
-    <p>
-      Veinticuatro especies de acuario y de agua fría. Los datos salen de las fichas del proyecto.
-    </p>
+  <header class="af-page-head af-page-head--row">
+    <div>
+      <p class="af-kicker">Guía</p>
+      <h1>Especies</h1>
+      <p>
+        El catálogo del proyecto, más las especies que agregues para una pecera que no está en la
+        lista.
+      </p>
+    </div>
+    <a class="af-btn af-btn--primary" routerLink="/app/especies/nueva">Agregar especie</a>
   </header>
 
   <app-lista-especies [especies]="especies()" rutaDe="/app/especies" />

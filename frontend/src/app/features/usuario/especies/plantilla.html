@@ -1,0 +1,156 @@
+<section class="af-page">
+  <a class="af-back" routerLink="/app/especies">Volver a especies</a>
+
+  <header class="af-page-head">
+    <p class="af-kicker">A medida</p>
+    <h1>Agregar especie</h1>
+    <p>
+      Para una pecera cuya especie no está en el catálogo. Los reportes, la sugerencia de horarios y
+      las alertas que siguen a la especie van a usar estos rangos.
+    </p>
+  </header>
+
+  <form class="af-panel af-admin-form" (submit)="$event.preventDefault(); guardar()">
+    <div class="af-field">
+      <span>Foto del pez (opcional)</span>
+      <div class="af-input-row">
+        <button type="button" class="af-btn af-btn--ghost af-btn--small" (click)="archivo.click()">
+          Elegir archivo
+        </button>
+        <span>{{ nombreArchivo() || 'Ningún archivo elegido' }}</span>
+      </div>
+      <input
+        #archivo
+        class="af-sr"
+        type="file"
+        accept="image/*"
+        aria-label="Elegir archivo de la foto"
+        (change)="elegirFoto($event)"
+      />
+    </div>
+    @if (foto(); as src) {
+      <figure class="af-hero-photo">
+        <img [src]="src" alt="Vista previa de la foto" width="960" height="600" />
+      </figure>
+      <button type="button" class="af-btn af-btn--ghost af-btn--small" (click)="quitarFoto(archivo)">
+        Quitar foto
+      </button>
+    }
+    <p class="af-hint">Si no subís una foto, la especie queda con un dibujo genérico.</p>
+
+    <label class="af-field">
+      <span>Nombre</span>
+      <input
+        type="text"
+        maxlength="40"
+        required
+        autocomplete="off"
+        placeholder="Por ejemplo, Betta de la sala"
+        [value]="nombre()"
+        (input)="nombre.set($any($event.target).value)"
+      />
+    </label>
+
+    <label class="af-field">
+      <span>Tipo de agua</span>
+      <select (change)="tipoAgua.set($any($event.target).value)">
+        <option value="tropical" [selected]="tipoAgua() === 'tropical'">Agua tropical</option>
+        <option value="fria" [selected]="tipoAgua() === 'fria'">Agua fría</option>
+      </select>
+    </label>
+
+    <div class="af-form-grid">
+      <label class="af-field">
+        <span>Temperatura mínima (°C)</span>
+        <input
+          type="number"
+          min="0"
+          max="40"
+          step="0.1"
+          required
+          [value]="tempMin()"
+          (input)="tempMin.set($any($event.target).value)"
+        />
+      </label>
+      <label class="af-field">
+        <span>Temperatura máxima (°C)</span>
+        <input
+          type="number"
+          min="0"
+          max="40"
+          step="0.1"
+          required
+          [value]="tempMax()"
+          (input)="tempMax.set($any($event.target).value)"
+        />
+      </label>
+      <label class="af-field">
+        <span>pH mínimo</span>
+        <input
+          type="number"
+          min="0"
+          max="14"
+          step="0.1"
+          required
+          [value]="phMin()"
+          (input)="phMin.set($any($event.target).value)"
+        />
+      </label>
+      <label class="af-field">
+        <span>pH máximo</span>
+        <input
+          type="number"
+          min="0"
+          max="14"
+          step="0.1"
+          required
+          [value]="phMax()"
+          (input)="phMax.set($any($event.target).value)"
+        />
+      </label>
+      <label class="af-field">
+        <span>TDS máximo (ppm, opcional)</span>
+        <input
+          type="number"
+          min="0"
+          max="10000"
+          step="1"
+          [value]="tdsMax()"
+          (input)="tdsMax.set($any($event.target).value)"
+        />
+      </label>
+      <label class="af-field">
+        <span>Porciones por toma (opcional)</span>
+        <input
+          type="number"
+          min="1"
+          max="30"
+          step="1"
+          [value]="porciones()"
+          (input)="porciones.set($any($event.target).value)"
+        />
+      </label>
+      <label class="af-field">
+        <span>Tomas por día (opcional)</span>
+        <input
+          type="number"
+          min="1"
+          max="12"
+          step="1"
+          [value]="tomasPorDia()"
+          (input)="tomasPorDia.set($any($event.target).value)"
+        />
+      </label>
+    </div>
+
+    @if (error(); as mensaje) {
+      <p class="af-alert" role="alert">{{ mensaje }}</p>
+    }
+
+    <div class="af-actions">
+      <button type="submit" class="af-btn af-btn--primary" [disabled]="guardando()">
+        {{ guardando() ? 'Guardando…' : 'Agregar especie' }}
+      </button>
+    </div>
+  </form>
+</section>

@@ -56,6 +56,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/usuario/alertas/alertas').then((m) => m.Alertas),
       },
       {
+        path: 'cuenta',
+        data: { titulo: 'Cuenta' },
+        loadComponent: () => import('./features/usuario/cuenta/cuenta').then((m) => m.Cuenta),
+      },
+      {
         path: 'especies',
         data: { titulo: 'Especies' },
         loadComponent: () => import('./features/usuario/especies/especies').then((m) => m.Especies),
@@ -65,6 +70,12 @@ export const routes: Routes = [
         data: { titulo: 'Créditos de las fotos' },
         loadComponent: () =>
           import('./features/especies-creditos/creditos-fotos').then((m) => m.CreditosFotos),
+      },
+      {
+        path: 'especies/nueva',
+        data: { titulo: 'Agregar especie' },
+        loadComponent: () =>
+          import('./features/usuario/especies/plantilla').then((m) => m.Plantilla),
       },
       {
         path: 'especies/:slug',

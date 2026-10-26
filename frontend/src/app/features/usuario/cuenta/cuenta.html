@@ -1,0 +1,52 @@
+<section class="af-page">
+  <header class="af-page-head">
+    <p class="af-kicker">Tu cuenta</p>
+    <h1>{{ usuario()?.nombre }}</h1>
+    <p>Entrá con {{ usuario()?.email }}. Acá podés cambiar tu contraseña.</p>
+  </header>
+
+  <form class="af-panel af-admin-form" (submit)="$event.preventDefault(); guardar()">
+    <h2>Contraseña</h2>
+    <label class="af-field">
+      <span>Contraseña actual</span>
+      <input
+        type="password"
+        autocomplete="current-password"
+        [value]="actual()"
+        (input)="actual.set($any($event.target).value)"
+      />
+    </label>
+    <label class="af-field">
+      <span>Contraseña nueva</span>
+      <input
+        type="password"
+        autocomplete="new-password"
+        [value]="nueva()"
+        (input)="nueva.set($any($event.target).value)"
+      />
+    </label>
+    <label class="af-field">
+      <span>Repetir la contraseña nueva</span>
+      <input
+        type="password"
+        autocomplete="new-password"
+        [value]="repetir()"
+        (input)="repetir.set($any($event.target).value)"
+      />
+    </label>
+    <p class="af-hint">Tiene que tener al menos 8 caracteres.</p>
+
+    @if (lista()) {
+      <p class="af-ok" role="status">Listo. La próxima vez entrá con la contraseña nueva.</p>
+    }
+    @if (error(); as mensaje) {
+      <p class="af-alert" role="alert">{{ mensaje }}</p>
+    }
+
+    <div class="af-actions">
+      <button type="submit" class="af-btn af-btn--primary" [disabled]="guardando()">
+        {{ guardando() ? 'Guardando…' : 'Cambiar contraseña' }}
+      </button>
+    </div>
+  </form>
+</section>

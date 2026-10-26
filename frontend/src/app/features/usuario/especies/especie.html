@@ -11,6 +11,11 @@
         <p class="af-hint">También: {{ otros.join(', ') }}</p>
       }
       <p>{{ ficha.guia }}</p>
+      @if (ficha.personalizada) {
+        <p class="af-callout">
+          Plantilla armada por vos. Los reportes y las alertas usan estos rangos.
+        </p>
+      }
     </header>
 
     <app-ficha-especie [especie]="ficha" />

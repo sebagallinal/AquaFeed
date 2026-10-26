@@ -117,6 +117,8 @@ export interface PerfilEspecie {
   id: string;
   slug: string;
   nombre: string;
+  /** true si la armó un usuario, y no sale del catálogo de fichas. */
+  personalizada?: boolean;
   /** Otros nombres comunes de la ficha, para mostrar y para el buscador. */
   nombresComunes?: readonly string[];
   nombreCientifico: string;

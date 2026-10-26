@@ -48,6 +48,10 @@ export class Reportes {
     const lista = this.peceras() ?? [];
     return lista.find((p) => p.dispositivo.id === this.pecera()) ?? lista[0] ?? null;
   });
+  /** La pecera de la URL, o la que quedó elegida, para poder volver desde esta pantalla. */
+  protected readonly destinoPecera = computed(
+    () => this.seleccionada()?.dispositivo.id ?? this.pecera() ?? null,
+  );
   private readonly idSeleccionada = computed(() => this.seleccionada()?.dispositivo.id ?? null);
   protected readonly especie = computed(() => this.seleccionada()?.especie ?? null);
 

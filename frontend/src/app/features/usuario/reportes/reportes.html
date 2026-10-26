@@ -1,4 +1,8 @@
 <section class="af-page">
+  @if (destinoPecera(); as id) {
+    <a class="af-back" [routerLink]="['/app/dispositivos', id]">Volver a la pecera</a>
+  }
+
   <header class="af-page-head">
     <h1>Reportes</h1>
     <p>

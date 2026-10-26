@@ -17,6 +17,13 @@ import type {
 } from '../models/reporte.model';
 import type { CambiosUsuario, NuevoUsuario, Usuario } from '../models/usuario.model';
 import {
+  especiePorId,
+  guardarPlantilla,
+  perfilPorSlug,
+  plantillasDeUsuario,
+  type NuevaPlantilla,
+} from '../especies/plantillas';
+import {
   DatosApi,
   PeceraNoDisponibleError,
   type AlertaVista,
@@ -297,7 +304,19 @@ export class MockDatosService implements DatosApi {
   }
 
   especie(slug: string): Observable<PerfilEspecie | null> {
-    return of(ESPECIES.find((item) => item.slug === slug) ?? null);
+    return of(perfilPorSlug(slug));
+  }
+
+  plantillasDe(usuarioId: string): Observable<PerfilEspecie[]> {
+    return of(plantillasDeUsuario(usuarioId));
+  }
+
+  crearPlantilla(usuarioId: string, datos: NuevaPlantilla): Observable<PerfilEspecie> {
+    try {
+      return of(guardarPlantilla(usuarioId, datos));
+    } catch (error) {
+      return throwError(() => error);
+    }
   }
 
   alimentar(
@@ -592,7 +611,7 @@ export class MockDatosService implements DatosApi {
       },
       lectura: lecturaActual,
       proxima: proximaAlimentacion(this.horariosDe(dispositivo.id)),
-      especie: ESPECIES.find((item) => item.id === dispositivo.speciesProfileId) ?? null,
+      especie: especiePorId(dispositivo.speciesProfileId),
       alertasAbiertas: this.alertas().filter(
         (alerta) => alerta.deviceId === dispositivo.id && alerta.estado === 'abierta',
       ).length,
@@ -614,7 +633,7 @@ export class MockDatosService implements DatosApi {
 
   private adminDe(dispositivo: Dispositivo): DispositivoAdmin {
     const dueno = USUARIOS.find((item) => item.id === dispositivo.ownerId);
-    const especie = ESPECIES.find((item) => item.id === dispositivo.speciesProfileId);
+    const especie = especiePorId(dispositivo.speciesProfileId);
     const lecturaActual = this.lecturas.get(dispositivo.id);
     return {
       ...dispositivo,

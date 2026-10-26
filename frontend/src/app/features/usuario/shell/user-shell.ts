@@ -23,6 +23,7 @@ export class UserShell {
     { etiqueta: 'Reportes', ruta: '/app/reportes', icono: 'bar_chart' },
     { etiqueta: 'Alertas', ruta: '/app/alertas', icono: 'notifications', badge: this.abiertas() },
     { etiqueta: 'Especies', ruta: '/app/especies', icono: 'menu_book' },
+    { etiqueta: 'Cuenta', ruta: '/app/cuenta', icono: 'key' },
   ]);
 
   constructor() {

@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { RouterLink } from '@angular/router';
 
 import type { CambiosPecera } from '../../data/datos-api';
 import type { PerfilEspecie } from '../../models/perfil-especie.model';
@@ -13,7 +14,7 @@ export interface EditarPeceraData {
 
 @Component({
   selector: 'app-editar-pecera-dialog',
-  imports: [MatDialogModule, MatButtonModule],
+  imports: [MatDialogModule, MatButtonModule, RouterLink],
   templateUrl: './editar-pecera-dialog.html',
 })
 export class EditarPeceraDialog {
@@ -43,5 +44,9 @@ export class EditarPeceraDialog {
       return;
     }
     this.ref.close({ nombre: this.nombre().trim(), especieId: this.especieId() || null });
+  }
+
+  protected cerrar(): void {
+    this.ref.close();
   }
 }

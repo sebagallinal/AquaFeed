@@ -24,6 +24,13 @@ import {
   type ResumenAdmin,
 } from './datos-api';
 import { ESPECIES } from './especies.mock';
+import {
+  especiePorId,
+  guardarPlantilla,
+  perfilPorSlug,
+  plantillasDeUsuario,
+  type NuevaPlantilla,
+} from '../especies/plantillas';
 
 const API = '/api/v1';
 
@@ -130,7 +137,19 @@ export class HttpDatosService implements DatosApi {
   }
 
   especie(slug: string): Observable<PerfilEspecie | null> {
-    return of(ESPECIES.find((item) => item.slug === slug) ?? null);
+    return of(perfilPorSlug(slug));
+  }
+
+  plantillasDe(usuarioId: string): Observable<PerfilEspecie[]> {
+    return of(plantillasDeUsuario(usuarioId));
+  }
+
+  crearPlantilla(usuarioId: string, datos: NuevaPlantilla): Observable<PerfilEspecie> {
+    try {
+      return of(guardarPlantilla(usuarioId, datos));
+    } catch (error) {
+      return throwError(() => error);
+    }
   }
 
   alimentar(
@@ -257,7 +276,7 @@ function resumen({ dispositivo, lectura, horarios }: PeceraBackend): PeceraResum
     dispositivo,
     lectura,
     proxima: proximaAlimentacion(horarios ?? []),
-    especie: especieDe(dispositivo.speciesProfileId),
+    especie: especiePorId(dispositivo.speciesProfileId),
     alertasAbiertas: 0, // ninguna pantalla lo muestra por pecera; la lista sale de /alertas
   };
 }
@@ -265,12 +284,8 @@ function resumen({ dispositivo, lectura, horarios }: PeceraBackend): PeceraResum
 function conEspecie(dispositivo: DispositivoAdmin): DispositivoAdmin {
   return {
     ...dispositivo,
-    especieNombre: especieDe(dispositivo.speciesProfileId)?.nombre ?? null,
+    especieNombre: especiePorId(dispositivo.speciesProfileId)?.nombre ?? null,
   };
-}
-
-function especieDe(id: string | null): PerfilEspecie | null {
-  return ESPECIES.find((item) => item.id === id) ?? null;
 }
 
 function nullSiNoExiste(error: unknown): Observable<null> {
