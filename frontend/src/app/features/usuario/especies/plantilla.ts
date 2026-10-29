@@ -118,7 +118,7 @@ function numero(texto: string): number | null {
   return Number.isFinite(valor) ? valor : null;
 }
 
-/** Achica la foto para poder guardarla en el navegador junto con la especie. */
+/** Achica la foto para que viaje y se guarde junto con la especie (el backend acepta hasta 500 KB). */
 function reducirImagen(archivo: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(archivo);

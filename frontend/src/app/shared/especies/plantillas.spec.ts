@@ -1,4 +1,12 @@
-import { CLAVE_PLANTILLAS, especiePorId, guardarPlantilla, validarPlantilla } from './plantillas';
+import {
+  armarPlantilla,
+  CLAVE_PLANTILLAS,
+  datosDePlantilla,
+  especiePorId,
+  guardarPlantilla,
+  nuevoIdPlantilla,
+  validarPlantilla,
+} from './plantillas';
 
 const BASE = {
   nombre: 'Betta de la sala',
@@ -32,9 +40,28 @@ describe('plantillas personalizadas', () => {
 
   it('guarda la foto subida y rechaza una que no es imagen', () => {
     const foto = 'data:image/jpeg;base64,abc';
-    expect(guardarPlantilla('usr-nahuel', { ...BASE, nombre: 'Con foto', fotoSrc: foto }).foto.src).toBe(
-      foto,
-    );
+    expect(
+      guardarPlantilla('usr-nahuel', { ...BASE, nombre: 'Con foto', fotoSrc: foto }).foto.src,
+    ).toBe(foto);
     expect(validarPlantilla({ ...BASE, fotoSrc: 'https://ejemplo.com/pez.jpg' })).toContain('foto');
+  });
+});
+
+describe('especies propias en el backend', () => {
+  it('genera ids con el formato que acepta el backend', () => {
+    expect(nuevoIdPlantilla()).toMatch(/^pers-[0-9a-f]{12}$/);
+  });
+
+  it('recupera los datos cargados a partir de la ficha armada', () => {
+    const perfil = armarPlantilla('pers-0123456789ab', BASE);
+    expect(perfil.id).toBe('pers-0123456789ab');
+    expect(datosDePlantilla(perfil)).toEqual({ ...BASE, fotoSrc: null });
+  });
+
+  it('conserva una foto propia y descarta el dibujo genérico', () => {
+    const foto = 'data:image/jpeg;base64,AAAA';
+    expect(
+      datosDePlantilla(armarPlantilla('pers-0123456789ab', { ...BASE, fotoSrc: foto })).fotoSrc,
+    ).toBe(foto);
   });
 });

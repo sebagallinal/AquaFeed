@@ -95,6 +95,30 @@ async function findUserById(id) {
   return rows[0];
 }
 
+// ---------- Especies propias (privadas de cada usuario) ----------
+
+async function listCustomSpecies(usuarioId) {
+  const [rows] = await pool.query(
+    'SELECT id, datos FROM especies_usuario WHERE usuario_id = ? ORDER BY creado_en, id', [usuarioId]
+  );
+  return rows.map((r) => ({ id: r.id, datos: JSON.parse(r.datos) }));
+}
+
+async function getCustomSpecies(id) {
+  const [rows] = await pool.query('SELECT id, usuario_id, datos FROM especies_usuario WHERE id = ?', [id]);
+  return rows[0] ? { id: rows[0].id, usuarioId: rows[0].usuario_id, datos: JSON.parse(rows[0].datos) } : null;
+}
+
+async function countCustomSpecies(usuarioId) {
+  const [[{ n }]] = await pool.query('SELECT COUNT(*) AS n FROM especies_usuario WHERE usuario_id = ?', [usuarioId]);
+  return n;
+}
+
+async function createCustomSpecies(id, usuarioId, datos) {
+  await pool.query('INSERT INTO especies_usuario (id, usuario_id, datos) VALUES (?, ?, ?)',
+    [id, usuarioId, JSON.stringify(datos)]);
+}
+
 // ---------- Administración de cuentas ----------
 
 async function findUserByEmail(email) {
@@ -468,4 +492,5 @@ module.exports = {
   openAlert, closeAlert, listActiveAlerts, listAlerts, acknowledgeAlert, countOpenAlerts,
   findUserByEmail, createUser, updateUser, countActiveAdmins, accountState, forgetAccountState,
   assignDevice, createDevice,
+  listCustomSpecies, getCustomSpecies, countCustomSpecies, createCustomSpecies,
 };

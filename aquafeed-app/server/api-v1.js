@@ -216,11 +216,82 @@ module.exports = function apiV1({
       if (especieId !== null && !/^[a-z0-9-]{1,64}$/.test(String(especieId))) {
         return res.status(400).json({ message: 'La especie no es válida.' });
       }
+      // Una especie propia solo la puede usar quien la creó
+      if (especieId !== null && String(especieId).startsWith('pers-')) {
+        const propia = await db.getCustomSpecies(especieId);
+        if (!propia || propia.usuarioId !== req.user.id) {
+          return res.status(400).json({ message: 'Esa especie no existe.' });
+        }
+      }
       cambios.especieId = especieId;
     }
     await db.updateDevice(row.id, cambios);
     const horarios = await db.listSchedules([row.id]);
     res.json(toPecera(await db.getDevice(row.id), horarios[row.id]));
+  });
+
+  // ---------- Especies propias: privadas de cada usuario ----------
+
+  const ID_PROPIA = /^pers-[0-9a-f]{12}$/;
+  const MAX_PROPIAS = 30;
+
+  // Misma validación que el formulario (frontend/src/app/shared/especies/plantillas.ts)
+  function validarEspeciePropia(b) {
+    const nombre = String(b?.nombre ?? '').trim().replace(/\s+/g, ' ');
+    if (nombre.length < 2 || nombre.length > 40) return 'El nombre tiene que tener entre 2 y 40 caracteres.';
+    if (b.tipoAgua !== 'tropical' && b.tipoAgua !== 'fria') return 'Elegí si el agua es tropical o fría.';
+    const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : NaN);
+    const rango = (min, max, piso, techo, nombreRango) => {
+      if (Number.isNaN(num(min)) || Number.isNaN(num(max))) return `Completá el mínimo y el máximo de ${nombreRango}.`;
+      if (min < piso || max > techo || min >= max) {
+        return `En ${nombreRango}, el mínimo tiene que ser menor que el máximo (entre ${piso} y ${techo}).`;
+      }
+      return null;
+    };
+    const opcional = (v, piso, techo, mensaje) =>
+      v === null || v === undefined || (Number.isFinite(v) && v >= piso && v <= techo) ? null : mensaje;
+    const entero = (v, piso, techo, mensaje) =>
+      v === null || v === undefined || (Number.isInteger(v) && v >= piso && v <= techo) ? null : mensaje;
+    const foto = b.fotoSrc;
+    const error =
+      rango(b.tempMin, b.tempMax, 0, 40, 'temperatura') ??
+      rango(b.phMin, b.phMax, 0, 14, 'pH') ??
+      opcional(b.tdsMax, 0, 10000, 'El TDS máximo tiene que estar entre 0 y 10000 ppm.') ??
+      entero(b.porciones, 1, 30, 'Las porciones tienen que ser un entero entre 1 y 30.') ??
+      entero(b.tomasPorDia, 1, 12, 'Las tomas por día tienen que ser un entero entre 1 y 12.') ??
+      (foto && (typeof foto !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/.test(foto) || foto.length > 500000)
+        ? 'La foto tiene que ser una imagen y no puede ser tan pesada.'
+        : null);
+    if (error) return error;
+    return {
+      nombre, tipoAgua: b.tipoAgua, tempMin: b.tempMin, tempMax: b.tempMax, phMin: b.phMin, phMax: b.phMax,
+      tdsMax: b.tdsMax ?? null, porciones: b.porciones ?? null, tomasPorDia: b.tomasPorDia ?? null,
+      fotoSrc: foto || null,
+    };
+  }
+
+  router.get('/especies/propias', authenticateToken, async (req, res) => {
+    res.json(await db.listCustomSpecies(req.user.id));
+  });
+
+  // El id lo genera el navegador: así una especie que ya estaba guardada ahí se sube con el mismo id
+  // y las peceras que la usaban la siguen encontrando.
+  router.post('/especies/propias', authenticateToken, async (req, res) => {
+    const id = String(req.body?.id ?? '');
+    if (!ID_PROPIA.test(id)) return res.status(400).json({ message: 'El identificador de la especie no es válido.' });
+    const existente = await db.getCustomSpecies(id);
+    if (existente) {
+      // Repetir el alta de la misma especie no es un error (por ejemplo, al subir las del navegador)
+      if (existente.usuarioId === req.user.id) return res.json({ id, datos: existente.datos });
+      return res.status(409).json({ message: 'El identificador ya está en uso.' });
+    }
+    const datos = validarEspeciePropia(req.body?.datos);
+    if (typeof datos === 'string') return res.status(400).json({ message: datos });
+    if ((await db.countCustomSpecies(req.user.id)) >= MAX_PROPIAS) {
+      return res.status(409).json({ message: `Se pueden guardar hasta ${MAX_PROPIAS} especies propias.` });
+    }
+    await db.createCustomSpecies(id, req.user.id, datos);
+    res.status(201).json({ id, datos });
   });
 
   router.get('/peceras/:id/alertas', authenticateToken, async (req, res) => {

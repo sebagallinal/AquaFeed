@@ -1,7 +1,11 @@
 import { ESPECIES } from '../data/especies.mock';
 import type { PerfilEspecie, RangosEspecie, TipoAgua } from '../models/perfil-especie.model';
 
-/** Las fichas del catálogo viven en el frontend. Las plantillas del usuario también, en este navegador. */
+/**
+ * Las fichas del catálogo viven en el frontend. Las especies propias de cada usuario se guardan en el
+ * backend (privadas) y acá se arman como ficha. El almacenamiento del navegador queda solo para el modo
+ * de prueba sin backend y para subir las que se guardaron ahí antes de que existiera el backend.
+ */
 export const CLAVE_PLANTILLAS = 'aquafeed.plantillas';
 
 export interface NuevaPlantilla {
@@ -71,7 +75,7 @@ export function guardarPlantilla(usuarioId: string, datos: NuevaPlantilla): Perf
   if (error) {
     throw new Error(error);
   }
-  const perfil = armar(datos);
+  const perfil = armarPlantilla(nuevoIdPlantilla(), datos);
   const mapa = leer();
   mapa[usuarioId] = [...(mapa[usuarioId] ?? []), perfil];
   escribir(mapa);
@@ -114,9 +118,47 @@ function escribir(mapa: Record<string, PerfilEspecie[]>): void {
   }
 }
 
-function armar(datos: NuevaPlantilla): PerfilEspecie {
+/** pers- y 12 hexadecimales: el mismo formato que valida el backend. */
+export function nuevoIdPlantilla(): string {
+  return `pers-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+}
+
+/** Quita del navegador las plantillas ya subidas al backend. */
+export function quitarPlantillasLocales(usuarioId: string, ids: readonly string[]): void {
+  const mapa = leer();
+  const quedan = (mapa[usuarioId] ?? []).filter((p) => !ids.includes(p.id));
+  if (quedan.length) {
+    mapa[usuarioId] = quedan;
+  } else {
+    delete mapa[usuarioId];
+  }
+  try {
+    escribir(mapa);
+  } catch {
+    // Si no se puede escribir, se vuelven a subir la próxima vez: el backend acepta el mismo id
+  }
+}
+
+/** Datos cargados por el usuario a partir de una ficha ya armada (para subir las del navegador). */
+export function datosDePlantilla(perfil: PerfilEspecie): NuevaPlantilla {
+  const tomas = Number(perfil.dosis?.tomasPorDia ?? NaN);
+  return {
+    nombre: perfil.nombre,
+    tipoAgua: perfil.tiposAgua[0] ?? 'tropical',
+    tempMin: perfil.temperatura?.ideal.intervalo.min ?? perfil.tempMinC ?? NaN,
+    tempMax: perfil.temperatura?.ideal.intervalo.max ?? perfil.tempMaxC ?? NaN,
+    phMin: perfil.ph?.ideal.intervalo.min ?? perfil.phMin ?? NaN,
+    phMax: perfil.ph?.ideal.intervalo.max ?? perfil.phMax ?? NaN,
+    tdsMax: perfil.tdsMaxPpm,
+    porciones: perfil.dosis?.porToma ?? perfil.porcionesSugeridas ?? null,
+    tomasPorDia: Number.isInteger(tomas) ? tomas : null,
+    fotoSrc: perfil.foto.src.startsWith('data:image/') ? perfil.foto.src : null,
+  };
+}
+
+/** Ficha completa de una especie propia a partir de lo que cargó el usuario. */
+export function armarPlantilla(id: string, datos: NuevaPlantilla): PerfilEspecie {
   const nombre = datos.nombre.trim().replace(/\s+/g, ' ');
-  const id = `pers-${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
   const tomas = datos.tomasPorDia;
   const porciones = datos.porciones;
   const detalle = 'Rango de la plantilla personalizada.';

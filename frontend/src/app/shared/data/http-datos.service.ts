@@ -1,6 +1,20 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, EMPTY, map, Observable, of, switchMap, throwError, timer } from 'rxjs';
+import {
+  catchError,
+  EMPTY,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  shareReplay,
+  switchMap,
+  tap,
+  throwError,
+  timer,
+} from 'rxjs';
+
+import { AUTH_API } from '../../core/auth/auth-api';
 
 import { proximaAlimentacion } from '../fecha';
 import type { ConfigAlertas } from '../models/alerta.model';
@@ -25,10 +39,12 @@ import {
 } from './datos-api';
 import { ESPECIES } from './especies.mock';
 import {
-  especiePorId,
-  guardarPlantilla,
-  perfilPorSlug,
+  armarPlantilla,
+  datosDePlantilla,
+  nuevoIdPlantilla,
   plantillasDeUsuario,
+  quitarPlantillasLocales,
+  validarPlantilla,
   type NuevaPlantilla,
 } from '../especies/plantillas';
 
@@ -47,6 +63,18 @@ interface ReporteBackend {
   alimentaciones: AlimentacionReporte[];
 }
 
+/** Especie propia tal como la guarda el backend: solo lo que cargó el usuario. */
+interface EspeciePropiaBackend {
+  id: string;
+  datos: NuevaPlantilla;
+}
+
+/**
+ * Especies propias del usuario con sesión, por id. Las funciones de abajo (resumen, conEspecie)
+ * las buscan acá. Se llena al pedir peceras o especies.
+ */
+const PROPIAS = new Map<string, PerfilEspecie>();
+
 interface PeceraBackend {
   dispositivo: Dispositivo;
   lectura: Lectura | null;
@@ -56,23 +84,33 @@ interface PeceraBackend {
 /**
  * Datos del backend Express (`/api/v1`). El usuario sale del token, así que los `usuarioId`
  * de `DatosApi` no viajan.
- * Las fichas de especies siguen siendo las que trae el frontend.
+ * Las fichas del catálogo vienen con el frontend; las especies propias, del backend.
  */
 @Injectable()
 export class HttpDatosService implements DatosApi {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AUTH_API);
+
+  /** Especies propias del usuario, pedidas una vez por sesión. */
+  private propias$: Observable<PerfilEspecie[]> | null = null;
+  private propiasDe: string | null = null;
 
   pecerasDe(): Observable<PeceraResumen[]> {
-    return this.enVivo(() => this.http.get<PeceraBackend[]>(`${API}/peceras`)).pipe(
+    return this.cargarPropias().pipe(
+      switchMap(() => this.enVivo(() => this.http.get<PeceraBackend[]>(`${API}/peceras`))),
       map((lista) => lista.map(resumen)),
     );
   }
 
   pecera(id: string): Observable<PeceraDetalle | null> {
-    return this.enVivo(() =>
-      this.http.get<PeceraBackend>(`${API}/peceras/${encodeURIComponent(id)}`).pipe(
-        map((pecera): PeceraDetalle => ({ ...resumen(pecera), horarios: pecera.horarios })),
-        catchError(nullSiNoExiste),
+    return this.cargarPropias().pipe(
+      switchMap(() =>
+        this.enVivo(() =>
+          this.http.get<PeceraBackend>(`${API}/peceras/${encodeURIComponent(id)}`).pipe(
+            map((pecera): PeceraDetalle => ({ ...resumen(pecera), horarios: pecera.horarios })),
+            catchError(nullSiNoExiste),
+          ),
+        ),
       ),
     );
   }
@@ -137,19 +175,34 @@ export class HttpDatosService implements DatosApi {
   }
 
   especie(slug: string): Observable<PerfilEspecie | null> {
-    return of(perfilPorSlug(slug));
-  }
-
-  plantillasDe(usuarioId: string): Observable<PerfilEspecie[]> {
-    return of(plantillasDeUsuario(usuarioId));
-  }
-
-  crearPlantilla(usuarioId: string, datos: NuevaPlantilla): Observable<PerfilEspecie> {
-    try {
-      return of(guardarPlantilla(usuarioId, datos));
-    } catch (error) {
-      return throwError(() => error);
+    const delCatalogo = ESPECIES.find((item) => item.slug === slug);
+    if (delCatalogo) {
+      return of(delCatalogo);
     }
+    return this.cargarPropias().pipe(
+      map((propias) => propias.find((p) => p.slug === slug) ?? null),
+    );
+  }
+
+  plantillasDe(): Observable<PerfilEspecie[]> {
+    return this.cargarPropias();
+  }
+
+  crearPlantilla(_usuarioId: string, datos: NuevaPlantilla): Observable<PerfilEspecie> {
+    const error = validarPlantilla(datos);
+    if (error) {
+      return throwError(() => new PeceraNoDisponibleError(error));
+    }
+    return this.http
+      .post<EspeciePropiaBackend>(`${API}/especies/propias`, { id: nuevoIdPlantilla(), datos })
+      .pipe(
+        map((guardada) => armarPlantilla(guardada.id, guardada.datos)),
+        tap((perfil) => {
+          PROPIAS.set(perfil.id, perfil);
+          this.propias$ = null; // la próxima lectura trae la lista con la nueva
+        }),
+        catchError(conMensaje('No se pudo guardar la especie.')),
+      );
   }
 
   alimentar(
@@ -263,6 +316,60 @@ export class HttpDatosService implements DatosApi {
     return this.enVivo(() => this.http.get<AlertaVista[]>(`${API}/admin/alertas`));
   }
 
+  /**
+   * Especies propias del usuario con sesión. La primera vez sube las que hubiera guardadas en este
+   * navegador (de antes de que se guardaran en el servidor), con el mismo id, así las peceras que
+   * ya las usaban las siguen encontrando.
+   */
+  private cargarPropias(): Observable<PerfilEspecie[]> {
+    const usuarioId = this.auth.usuario()?.id ?? null;
+    if (!this.propias$ || this.propiasDe !== usuarioId) {
+      this.propiasDe = usuarioId;
+      PROPIAS.clear();
+      this.propias$ = !usuarioId
+        ? of([])
+        : this.subirLocales(usuarioId).pipe(
+            switchMap(() => this.http.get<EspeciePropiaBackend[]>(`${API}/especies/propias`)),
+            map((lista) => lista.map((e) => armarPlantilla(e.id, e.datos))),
+            tap((lista) => {
+              PROPIAS.clear();
+              lista.forEach((p) => PROPIAS.set(p.id, p));
+            }),
+            // Sin especies propias la app sigue funcionando con el catálogo
+            catchError(() => of([] as PerfilEspecie[])),
+            shareReplay(1),
+          );
+    }
+    return this.propias$;
+  }
+
+  private subirLocales(usuarioId: string): Observable<unknown> {
+    const locales = plantillasDeUsuario(usuarioId);
+    if (locales.length === 0) {
+      return of(null);
+    }
+    return forkJoin(
+      locales.map((p) =>
+        this.http
+          .post<EspeciePropiaBackend>(`${API}/especies/propias`, {
+            id: p.id,
+            datos: datosDePlantilla(p),
+          })
+          .pipe(
+            map(() => p.id),
+            catchError(() => of(null)),
+          ),
+      ),
+    ).pipe(
+      tap((subidas) =>
+        quitarPlantillasLocales(
+          usuarioId,
+          subidas.filter((id): id is string => id !== null),
+        ),
+      ),
+    );
+  }
+
   /** Repite el pedido cada 5 s. Si uno falla, la pantalla se queda con el último valor. */
   private enVivo<T>(pedido: () => Observable<T>): Observable<T> {
     return timer(0, INTERVALO_VIVO_MS).pipe(
@@ -276,7 +383,7 @@ function resumen({ dispositivo, lectura, horarios }: PeceraBackend): PeceraResum
     dispositivo,
     lectura,
     proxima: proximaAlimentacion(horarios ?? []),
-    especie: especiePorId(dispositivo.speciesProfileId),
+    especie: especieDe(dispositivo.speciesProfileId),
     alertasAbiertas: 0, // ninguna pantalla lo muestra por pecera; la lista sale de /alertas
   };
 }
@@ -284,8 +391,21 @@ function resumen({ dispositivo, lectura, horarios }: PeceraBackend): PeceraResum
 function conEspecie(dispositivo: DispositivoAdmin): DispositivoAdmin {
   return {
     ...dispositivo,
-    especieNombre: especiePorId(dispositivo.speciesProfileId)?.nombre ?? null,
+    especieNombre: nombreEspecieAdmin(dispositivo.speciesProfileId),
   };
+}
+
+/** Catálogo o especie propia del usuario con sesión. */
+function especieDe(id: string | null): PerfilEspecie | null {
+  if (!id) {
+    return null;
+  }
+  return ESPECIES.find((item) => item.id === id) ?? PROPIAS.get(id) ?? null;
+}
+
+/** El admin no ve las especies propias de otros usuarios: solo que la pecera usa una. */
+function nombreEspecieAdmin(id: string | null): string | null {
+  return especieDe(id)?.nombre ?? (id?.startsWith('pers-') ? 'Especie propia del usuario' : null);
 }
 
 function nullSiNoExiste(error: unknown): Observable<null> {

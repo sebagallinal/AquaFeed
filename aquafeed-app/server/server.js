@@ -31,7 +31,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-app.use(express.json());
+// 1 MB: las especies propias pueden traer una foto (ya reducida en el navegador)
+app.use(express.json({ limit: '1mb' }));
 
 
 // ####################

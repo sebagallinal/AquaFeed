@@ -84,7 +84,7 @@ export interface DatosApi {
   reconocerAlerta(alertaId: string, usuarioId: string): Observable<void>;
   especies(): Observable<PerfilEspecie[]>;
   especie(slug: string): Observable<PerfilEspecie | null>;
-  /** Plantillas que armó este usuario en este navegador. */
+  /** Especies propias de este usuario. Son privadas: solo las ve quien las creó. */
   plantillasDe(usuarioId: string): Observable<PerfilEspecie[]>;
   crearPlantilla(usuarioId: string, datos: NuevaPlantilla): Observable<PerfilEspecie>;
   alimentar(deviceId: string, usuarioId: string, portions: number): Observable<ComandoAlimentacion>;

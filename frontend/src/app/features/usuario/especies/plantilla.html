@@ -6,7 +6,8 @@
     <h1>Agregar especie</h1>
     <p>
       Para una pecera cuya especie no está en el catálogo. Los reportes, la sugerencia de horarios y
-      las alertas que siguen a la especie van a usar estos rangos.
+      las alertas que siguen a la especie van a usar estos rangos. Solo vos la vas a ver, desde
+      cualquier dispositivo en el que entres con tu cuenta.
     </p>
   </header>
 
@@ -32,7 +33,11 @@
       <figure class="af-hero-photo">
         <img [src]="src" alt="Vista previa de la foto" width="960" height="600" />
       </figure>
-      <button type="button" class="af-btn af-btn--ghost af-btn--small" (click)="quitarFoto(archivo)">
+      <button
+        type="button"
+        class="af-btn af-btn--ghost af-btn--small"
+        (click)="quitarFoto(archivo)"
+      >
         Quitar foto
       </button>
     }

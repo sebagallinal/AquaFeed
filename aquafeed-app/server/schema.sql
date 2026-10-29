@@ -117,3 +117,15 @@ CREATE TABLE IF NOT EXISTS alertas (
 ALTER TABLE config_alertas ADD COLUMN IF NOT EXISTS temp_especie TINYINT(1) NOT NULL DEFAULT 0 AFTER temp_max;
 ALTER TABLE config_alertas ADD COLUMN IF NOT EXISTS ph_especie TINYINT(1) NOT NULL DEFAULT 0 AFTER ph_max;
 ALTER TABLE config_alertas ADD COLUMN IF NOT EXISTS tds_especie TINYINT(1) NOT NULL DEFAULT 0 AFTER tds_max;
+
+-- Especies que arma cada usuario. Son privadas: solo las ve y las usa quien las creó.
+-- datos: lo que cargó el usuario (nombre, tipo de agua, rangos, porciones, tomas y foto), en JSON.
+-- El frontend arma la ficha completa a partir de esos datos.
+CREATE TABLE IF NOT EXISTS especies_usuario (
+  id          VARCHAR(20)  NOT NULL PRIMARY KEY,   -- pers- + 12 hexadecimales
+  usuario_id  INT          NOT NULL,
+  datos       MEDIUMTEXT   NOT NULL,
+  creado_en   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_especies_usuario (usuario_id),
+  CONSTRAINT fk_especies_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
